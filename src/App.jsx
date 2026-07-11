@@ -1043,7 +1043,7 @@ export function App() {
                     <span className="spinner" />
                   ) : (
                     <>
-                      <span>생성하기</span>
+                      <span>{hasSearched ? "검색" : "생성하기"}</span>
                       <ArrowRight size={18} />
                     </>
                   )}

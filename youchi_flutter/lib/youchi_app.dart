@@ -433,42 +433,46 @@ class _PromptCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: EdgeInsets.all(compact ? 16 : 32),
-      decoration: glassDecoration(radius: compact ? 18 : 24),
+      decoration: compact
+          ? BoxDecoration(
+              color: const Color(0x6B000000),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: const Color(0x3DD0BCFF)),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x55000000),
+                  blurRadius: 42,
+                  offset: Offset(0, 18),
+                ),
+              ],
+            )
+          : glassDecoration(radius: 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (!compact) ...[
-            const Row(
-              children: [
-                Icon(
-                  Icons.auto_awesome,
+          Row(
+            children: [
+              const Icon(
+                Icons.auto_awesome,
+                color: YouchiColors.accentBright,
+                size: 16,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                compact ? 'SEARCH KEYWORD' : 'NEW GENERATION AI',
+                style: const TextStyle(
                   color: YouchiColors.accentBright,
-                  size: 16,
+                  fontSize: 12,
+                  letterSpacing: 1.2,
+                  fontWeight: FontWeight.w800,
                 ),
-                SizedBox(width: 8),
-                Text(
-                  'NEW GENERATION AI',
-                  style: TextStyle(
-                    color: YouchiColors.accentBright,
-                    fontSize: 12,
-                    letterSpacing: 1.2,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-          ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              if (compact) ...[
-                const Icon(
-                  Icons.auto_awesome,
-                  color: YouchiColors.accentBright,
-                ),
-                const SizedBox(width: 12),
-              ],
               Expanded(
                 child: TextField(
                   controller: controller,
@@ -501,7 +505,7 @@ class _PromptCard extends StatelessWidget {
                     backgroundColor: Colors.transparent,
                     shadowColor: Colors.transparent,
                     foregroundColor: Colors.white,
-                    minimumSize: Size(compact ? 48 : 148, compact ? 48 : 56),
+                    minimumSize: Size(compact ? 116 : 148, compact ? 48 : 56),
                   ),
                   onPressed: loading ? null : () => onSubmit(),
                   icon: loading
@@ -511,7 +515,7 @@ class _PromptCard extends StatelessWidget {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.arrow_forward),
-                  label: compact ? const SizedBox.shrink() : const Text('생성하기'),
+                  label: Text(compact ? '검색' : '생성하기'),
                 ),
               ),
             ],
