@@ -1241,9 +1241,47 @@ class _KeywordPanel extends StatelessWidget {
   final YouchiApiClient api;
   final ValueChanged<String> onKeyword;
 
+  KeywordInsight _referenceSeoInsight(KeywordInsight base) {
+    final reference = selected;
+    if (reference == null) return base;
+    final keywords =
+        <String>[
+              ...query.split(RegExp(r'[\s,]+')),
+              ...reference.keywords,
+              if (reference.category != null) reference.category!,
+              if (reference.channel != null) reference.channel!,
+              reference.source,
+            ]
+            .map((item) => item.replaceFirst('#', '').trim())
+            .where((item) => item.length > 1)
+            .toSet()
+            .take(6)
+            .toList();
+    final category = reference.category ?? '광고';
+    final primaryKeyword = keywords.isNotEmpty ? keywords.first : query;
+    final title = reference.title.trim().isEmpty
+        ? query
+        : reference.title.trim();
+    return KeywordInsight(
+      provider: 'YOUCHI SEO',
+      status: 'SEO 추천',
+      headline: '$title 기반 SEO 제목 추천',
+      summary:
+          '선택한 레퍼런스 영상의 제목, 채널, 카테고리, 키워드를 바탕으로 실제 영상에 사용할 SEO 제목과 검색 키워드를 제안합니다.',
+      keywords: keywords,
+      angles: [
+        '$primaryKeyword｜$category 광고 레퍼런스로 보는 $title',
+        '$title처럼 만드는 $category 영상 제작 아이디어',
+        '$primaryKeyword 영상 제목 추천: 시청 이유가 바로 보이는 광고 구성',
+      ],
+      avoid: base.avoid,
+      fromGrok: base.fromGrok,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final data =
+    final baseData =
         insight ??
         KeywordInsight.fromJson({
           'provider': 'YOUCHI',
@@ -1255,11 +1293,7 @@ class _KeywordPanel extends StatelessWidget {
           'avoid': <String>[],
           'fromGrok': false,
         });
-    final seoTips = [
-      '"$query"처럼 핵심 키워드는 제목 앞쪽에 배치하세요.',
-      '제품군, 사용 상황, 기대 효과를 한 문장 안에 함께 넣으면 검색 의도가 더 선명해집니다.',
-      '영상 썸네일·제목·설명 첫 문장의 키워드를 같은 방향으로 맞추면 SEO 일관성이 좋아집니다.',
-    ];
+    final data = _referenceSeoInsight(baseData);
     const seoChecklist = [
       '대표 키워드가 제목 앞부분에 들어갔는가',
       '썸네일만 보고도 영상 내용을 이해할 수 있는가',
@@ -1355,13 +1389,6 @@ class _KeywordPanel extends StatelessWidget {
           ),
           const SizedBox(height: 18),
           const _SeoChecklistNotice(items: seoChecklist),
-          const SizedBox(height: 18),
-          _BulletSection(title: 'TIP. SEO 최적화 가이드', items: seoTips),
-          const SizedBox(height: 18),
-          _BulletSection(
-            title: 'TIP. 피해야 할 사항',
-            items: data.avoid.take(3).toList(),
-          ),
           const SizedBox(height: 20),
           _ProductionFlow(
             query: query,

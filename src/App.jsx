@@ -205,13 +205,41 @@ function buildFallbackKeywordInsights(query) {
   };
 }
 
-function buildSeoGuideTips(query) {
-  const trimmed = query.trim() || "핵심 키워드";
-  return [
-    `"${trimmed}"처럼 핵심 키워드는 제목 앞쪽에 배치하세요.`,
-    "제품군, 사용 상황, 기대 효과를 한 문장 안에 함께 넣으면 검색 의도가 더 선명해집니다.",
-    "영상 썸네일·제목·설명 첫 문장의 키워드를 같은 방향으로 맞추면 SEO 일관성이 좋아집니다.",
-  ];
+function buildReferenceSeoInsights(query, reference, fallbackInsights) {
+  const base = fallbackInsights || buildFallbackKeywordInsights(query);
+  if (!reference) return base;
+
+  const cleanTitle = String(reference.title || query).replace(/\s+/g, " ").trim();
+  const category = reference.category || deriveIntent(query)[0] || "광고";
+  const channel = reference.channel || reference.source || "레퍼런스";
+  const keywords = [
+    ...meaningfulTokens(query),
+    ...(reference.keywords || []),
+    category,
+    channel,
+    reference.source,
+  ]
+    .map((item) => String(item || "").replace(/^#/, "").trim())
+    .filter((item) => item.length > 1);
+  const uniqueKeywords = [...new Set(keywords)].slice(0, 6);
+  const primaryKeyword = uniqueKeywords[0] || query.trim() || category;
+
+  return {
+    ...base,
+    provider: "YOUCHI SEO",
+    status: "SEO 추천",
+    headline: `${cleanTitle} 기반 SEO 제목 추천`,
+    summary:
+      "선택한 레퍼런스 영상의 제목, 채널, 카테고리, 키워드를 바탕으로 실제 영상에 사용할 SEO 제목과 검색 키워드를 제안합니다.",
+    keywords: uniqueKeywords,
+    angles: [
+      `${primaryKeyword}｜${category} 광고 레퍼런스로 보는 ${cleanTitle}`,
+      `${cleanTitle}처럼 만드는 ${category} 영상 제작 아이디어`,
+      `${primaryKeyword} 영상 제목 추천: 시청 이유가 바로 보이는 광고 구성`,
+    ],
+    avoid: base.avoid,
+    fromGrok: base.fromGrok,
+  };
 }
 
 const preProductionSeoChecklist = [
@@ -818,8 +846,7 @@ function KeywordInsightPanel({
   onKeywordClick,
   selectedReference,
 }) {
-  const data = insights || buildFallbackKeywordInsights(query);
-  const seoGuideTips = buildSeoGuideTips(query);
+  const data = buildReferenceSeoInsights(query, selectedReference, insights);
 
   return (
     <aside className="grok-panel" aria-label="구글 SEO 키워드와 제목 추천">
@@ -860,22 +887,6 @@ function KeywordInsightPanel({
         </div>
         <ul>
           {preProductionSeoChecklist.map((item) => (
-            <li key={item}>{item}</li>
-          ))}
-        </ul>
-      </div>
-      <div className="grok-section tip">
-        <h3>TIP. SEO 최적화 가이드</h3>
-        <ul>
-          {seoGuideTips.map((tip) => (
-            <li key={tip}>{tip}</li>
-          ))}
-        </ul>
-      </div>
-      <div className="grok-section avoid">
-        <h3>TIP. 피해야 할 사항</h3>
-        <ul>
-          {data.avoid.slice(0, 3).map((item) => (
             <li key={item}>{item}</li>
           ))}
         </ul>

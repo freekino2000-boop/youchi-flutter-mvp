@@ -468,10 +468,6 @@ button { color: inherit; }
   font-size: 12px;
   line-height: 1.55;
 }
-.grok-section.avoid ul { color: #9da0aa; }
-.grok-section.tip ul {
-  color: #c8c0ec;
-}
 .grok-section.keyword-section {
   padding-bottom: 2px;
 }
