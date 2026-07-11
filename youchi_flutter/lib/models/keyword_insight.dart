@@ -24,8 +24,8 @@ class KeywordInsight {
     return KeywordInsight(
       provider: '${source['provider'] ?? 'YOUCHI'}',
       status: '${source['status'] ?? '로컬 제안'}',
-      headline: '${source['headline'] ?? '키워드 인사이트'}',
-      summary: '${source['summary'] ?? '관련 키워드를 분석했습니다.'}',
+      headline: '${source['headline'] ?? 'SEO 키워드·제목 추천'}',
+      summary: '${source['summary'] ?? 'SEO 최적화를 추천합니다.'}',
       keywords: _stringList(source['keywords']),
       angles: _stringList(source['angles']),
       avoid: _stringList(source['avoid']),

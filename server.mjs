@@ -254,19 +254,19 @@ function buildLocalKeywordInsights(query) {
   return {
     provider: XAI_API_KEY ? "Grok fallback" : "YOUCHI 로컬 확장",
     status: XAI_API_KEY ? "Grok 응답 실패 시 로컬 제안" : "Grok API 키 연결 전",
-    headline: `${query.trim()} 검색을 위한 확장 키워드`,
+    headline: `${query.trim()} 구글 SEO 최적화 추천`,
     summary:
       intents.length > 0
-        ? `${primaryIntent} 의도로 해석하고, 실제 영상 제목·채널·카테고리와 연결되는 키워드를 우선 확장했습니다.`
-        : "입력한 키워드를 기준으로 YOUCHI DB 검색에 사용할 확장 키워드를 제안했습니다.",
+        ? `SEO 최적화를 추천합니다. ${primaryIntent} 관련 키워드와 영상 방향성을 바탕으로 구글 검색 노출에 유리한 키워드와 제목을 제안합니다.`
+        : "SEO 최적화를 추천합니다. 실제 관련 키워드와 영상 방향성을 바탕으로 구글 검색 노출에 유리한 키워드와 제목을 제안합니다.",
     keywords: [...new Set(keywordPool)].filter(Boolean).slice(0, 12),
     angles: [
-      `${primaryIntent} 제품이 실제로 사용되는 장면`,
-      "제품 특징이 화면에서 바로 보이는 클로즈업",
-      "광고 소재로 전환하기 좋은 후킹 컷",
-      "브랜드 무드와 소비자 상황이 함께 보이는 영상",
+      `${query.trim()} 광고 사례와 제작 방향`,
+      `${primaryIntent} 제품 추천 영상 레퍼런스`,
+      `${primaryIntent} 브랜드 영상 SEO 제목 예시`,
+      `구매 전환을 높이는 ${primaryIntent} 영상 키워드`,
     ],
-    avoid: ["키워드만 비슷하고 제품군이 다른 영상", "뷰티·패션 등 이종 카테고리 과매칭", "광고 소재로 활용하기 어려운 단순 일상 브이로그"],
+    avoid: ["검색 의도와 다른 제품군 키워드 남발", "뷰티·패션 등 이종 카테고리 과매칭", "제목에 실제 영상 내용과 다른 과장 키워드 사용"],
     fromGrok: false,
   };
 }
@@ -300,21 +300,21 @@ async function buildGrokKeywordInsights(query, topCandidates) {
           {
             role: "system",
             content:
-              "너는 광고 영상 레퍼런스 검색 기획자다. 한국어로만 답하고, 반드시 JSON만 반환한다.",
+              "너는 광고 영상 레퍼런스를 기반으로 구글 SEO 키워드와 제목을 설계하는 전문가다. 한국어로만 답하고, 반드시 JSON만 반환한다.",
           },
           {
             role: "user",
             content: JSON.stringify({
               task:
-                "사용자 검색어와 YOUCHI DB 상위 후보를 보고 광고 소재 탐색용 관련 키워드, 소재 방향, 제외 조건을 제안해줘. 이미지나 영상을 생성하지 말고 텍스트 JSON만 반환해.",
+                "사용자 검색어와 YOUCHI DB 상위 후보를 보고 구글 SEO 최적화를 위한 관련 키워드, 영상 방향성에 맞는 추천 제목, 피해야 할 SEO 방향을 제안해줘. 이미지나 영상을 생성하지 말고 텍스트 JSON만 반환해.",
               query,
               candidates,
               schema: {
                 headline: "string",
-                summary: "string",
-                keywords: ["string"],
-                angles: ["string"],
-                avoid: ["string"],
+                summary: "SEO 최적화를 추천합니다로 시작하는 string",
+                keywords: ["구글 SEO용 관련 키워드 string"],
+                angles: ["구글 검색 노출을 고려한 추천 영상 제목 string"],
+                avoid: ["피해야 할 SEO 방향 string"],
               },
             }),
           },

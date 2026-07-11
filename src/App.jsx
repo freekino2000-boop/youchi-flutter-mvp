@@ -187,20 +187,20 @@ function buildFallbackKeywordInsights(query) {
   return {
     provider: "YOUCHI 로컬 확장",
     status: "Grok API 키 연결 전",
-    headline: `${query.trim()} 검색을 위한 확장 키워드`,
+    headline: `${query.trim()} 구글 SEO 최적화 추천`,
     summary:
-      "Grok API 키가 연결되면 이 영역에 AI가 제안한 관련 키워드와 소재 방향이 표시됩니다. 이미지나 영상을 새로 만드는 기능은 아니며, 기존 레퍼런스 탐색을 돕는 영역입니다.",
+      "SEO 최적화를 추천합니다. 실제 관련 키워드와 영상 방향성을 바탕으로 구글 검색 노출에 유리한 키워드와 제목을 제안합니다.",
     keywords: [...new Set(defaultKeywords)].filter(Boolean).slice(0, 12),
     angles: [
-      `${primaryIntent} 제품이 실제로 사용되는 장면`,
-      "제품 특징이 화면에서 바로 보이는 클로즈업",
-      "광고 소재로 전환하기 좋은 후킹 컷",
-      "브랜드 무드와 소비자 상황이 함께 보이는 영상",
+      `${primaryIntent} 제품 추천 영상 레퍼런스`,
+      `${query.trim()} 광고 사례와 제작 방향`,
+      `${primaryIntent} 브랜드 영상 SEO 제목 예시`,
+      `구매 전환을 높이는 ${primaryIntent} 영상 키워드`,
     ],
     avoid: [
-      "키워드만 비슷하고 제품군이 다른 영상",
+      "검색 의도와 다른 제품군 키워드 남발",
       "이종 카테고리 과매칭",
-      "광고 소재로 활용하기 어려운 단순 일상 브이로그",
+      "제목에 실제 영상 내용과 다른 과장 키워드 사용",
     ],
     fromGrok: false,
   };
@@ -803,12 +803,12 @@ function KeywordInsightPanel({
   const data = insights || buildFallbackKeywordInsights(query);
 
   return (
-    <aside className="grok-panel" aria-label="Grok 관련 키워드 제안">
+    <aside className="grok-panel" aria-label="구글 SEO 키워드와 제목 추천">
       <SelectedReferenceCard reference={selectedReference} />
       <div className="grok-panel-header">
         <div>
-          <span className="eyebrow">Grok keyword insight</span>
-          <h2>키워드·소재 방향 제안</h2>
+          <span className="eyebrow">Google SEO insight</span>
+          <h2>SEO 키워드·제목 추천</h2>
         </div>
         <span className={`grok-status ${data.fromGrok ? "is-live" : ""}`}>
           {data.status}
@@ -818,7 +818,7 @@ function KeywordInsightPanel({
         <span>입력 키워드</span>
         <strong>{query}</strong>
       </div>
-      <p className="grok-summary">{loading ? "Grok/키워드 제안 결과를 불러오는 중입니다." : data.summary}</p>
+      <p className="grok-summary">{loading ? "SEO 키워드와 제목 추천을 불러오는 중입니다." : data.summary}</p>
       <div className="keyword-cloud">
         {data.keywords.map((keyword) => (
           <button type="button" key={keyword} onClick={() => onKeywordClick(keyword)}>
@@ -827,7 +827,7 @@ function KeywordInsightPanel({
         ))}
       </div>
       <div className="grok-section">
-        <h3>소재 방향</h3>
+        <h3>추천 제목</h3>
         <ul>
           {data.angles.map((angle) => (
             <li key={angle}>{angle}</li>
@@ -835,7 +835,7 @@ function KeywordInsightPanel({
         </ul>
       </div>
       <div className="grok-section avoid">
-        <h3>제외할 방향</h3>
+        <h3>피해야 할 SEO 방향</h3>
         <ul>
           {data.avoid.map((item) => (
             <li key={item}>{item}</li>

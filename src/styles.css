@@ -1500,6 +1500,8 @@ button { color: inherit; }
 .format-toggle {
   display: inline-flex;
   align-self: flex-end;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
   gap: 6px;
   border: 1px solid rgba(73,68,84,.5);
   border-radius: 999px;
@@ -1511,6 +1513,7 @@ button { color: inherit; }
 .format-toggle button {
   display: inline-flex;
   align-items: center;
+  flex: 0 0 auto;
   gap: 7px;
   min-height: 34px;
   border: 0;
@@ -1520,6 +1523,8 @@ button { color: inherit; }
   color: var(--faint);
   font-size: 13px;
   font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
   cursor: pointer;
 }
 

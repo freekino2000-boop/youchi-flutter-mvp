@@ -997,16 +997,15 @@ class _FormatToggle extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          for (final format in ContentFormat.values)
-            Padding(
-              padding: const EdgeInsets.only(right: 4),
-              child: _FormatButton(
-                label: _label(format),
-                count: counts[format] ?? 0,
-                selected: value == format,
-                onTap: () => onChanged(format),
-              ),
+          for (final format in ContentFormat.values) ...[
+            _FormatButton(
+              label: _label(format),
+              count: counts[format] ?? 0,
+              selected: value == format,
+              onTap: () => onChanged(format),
             ),
+            if (format != ContentFormat.values.last) const SizedBox(width: 4),
+          ],
         ],
       ),
     );
@@ -1043,6 +1042,9 @@ class _FormatButton extends StatelessWidget {
           children: [
             Text(
               label,
+              maxLines: 1,
+              softWrap: false,
+              overflow: TextOverflow.visible,
               style: TextStyle(
                 color: selected ? Colors.white : YouchiColors.faint,
                 fontWeight: FontWeight.w800,
@@ -1246,8 +1248,8 @@ class _KeywordPanel extends StatelessWidget {
         KeywordInsight.fromJson({
           'provider': 'YOUCHI',
           'status': '대기 중',
-          'headline': '키워드 인사이트',
-          'summary': '검색어를 입력하면 관련 키워드와 제작 방향이 표시됩니다.',
+          'headline': 'SEO 키워드·제목 추천',
+          'summary': 'SEO 최적화를 추천합니다. 검색어를 입력하면 구글 검색 노출에 유리한 키워드와 제목이 표시됩니다.',
           'keywords': <String>[],
           'angles': <String>[],
           'avoid': <String>[],
@@ -1267,7 +1269,7 @@ class _KeywordPanel extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'GROK KEYWORD INSIGHT',
+                      'GOOGLE SEO INSIGHT',
                       style: TextStyle(
                         color: YouchiColors.accentBright,
                         fontSize: 10,
@@ -1277,7 +1279,7 @@ class _KeywordPanel extends StatelessWidget {
                     ),
                     SizedBox(height: 6),
                     Text(
-                      'AI Production Assistant',
+                      'SEO Keyword & Title Assistant',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 20,
@@ -1325,9 +1327,9 @@ class _KeywordPanel extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 18),
-          _BulletSection(title: '소재 방향', items: data.angles),
+          _BulletSection(title: '추천 제목', items: data.angles),
           const SizedBox(height: 18),
-          _BulletSection(title: '피해야 할 방향', items: data.avoid),
+          _BulletSection(title: '피해야 할 SEO 방향', items: data.avoid),
           const SizedBox(height: 20),
           _ProductionFlow(
             query: query,
