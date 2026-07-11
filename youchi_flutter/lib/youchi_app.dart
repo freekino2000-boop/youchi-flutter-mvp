@@ -1260,6 +1260,15 @@ class _KeywordPanel extends StatelessWidget {
       '제품군, 사용 상황, 기대 효과를 한 문장 안에 함께 넣으면 검색 의도가 더 선명해집니다.',
       '영상 썸네일·제목·설명 첫 문장의 키워드를 같은 방향으로 맞추면 SEO 일관성이 좋아집니다.',
     ];
+    const seoChecklist = [
+      '대표 키워드가 제목 앞부분에 들어갔는가',
+      '썸네일만 보고도 영상 내용을 이해할 수 있는가',
+      '설명 첫 2~3줄에 영상 핵심 내용이 있는가',
+      '영상 초반 15~30초 안에 시청 이유를 제시했는가',
+      '정확한 자막과 챕터가 등록됐는가',
+      '관련 영상·재생목록으로 연결했는가',
+      '제목과 썸네일이 실제 영상 내용과 일치하는가',
+    ];
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: glassDecoration(radius: 0, color: const Color(0x66131315)),
@@ -1344,6 +1353,8 @@ class _KeywordPanel extends StatelessWidget {
                 _ChipButton(label: keyword, onTap: () => onKeyword(keyword)),
             ],
           ),
+          const SizedBox(height: 18),
+          const _SeoChecklistNotice(items: seoChecklist),
           const SizedBox(height: 18),
           _BulletSection(title: 'TIP. SEO 최적화 가이드', items: seoTips),
           const SizedBox(height: 18),
@@ -1788,6 +1799,61 @@ class _CutCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _SeoChecklistNotice extends StatelessWidget {
+  const _SeoChecklistNotice({required this.items});
+
+  final List<String> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        border: Border.all(color: const Color(0x554B3A7D)),
+        borderRadius: BorderRadius.circular(16),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0x332F2354), Color(0x12000000)],
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'NOTICE',
+            style: TextStyle(
+              color: YouchiColors.accentBright,
+              fontSize: 10,
+              letterSpacing: 1.2,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            '영상 제작 전 SEO 체크리스트',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 12),
+          for (final item in items)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 7),
+              child: Text(
+                '• $item',
+                style: const TextStyle(color: YouchiColors.muted, height: 1.45),
+              ),
+            ),
+        ],
       ),
     );
   }

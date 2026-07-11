@@ -214,6 +214,16 @@ function buildSeoGuideTips(query) {
   ];
 }
 
+const preProductionSeoChecklist = [
+  "대표 키워드가 제목 앞부분에 들어갔는가",
+  "썸네일만 보고도 영상 내용을 이해할 수 있는가",
+  "설명 첫 2~3줄에 영상 핵심 내용이 있는가",
+  "영상 초반 15~30초 안에 시청 이유를 제시했는가",
+  "정확한 자막과 챕터가 등록됐는가",
+  "관련 영상·재생목록으로 연결했는가",
+  "제목과 썸네일이 실제 영상 내용과 일치하는가",
+];
+
 function scoreReference(reference, query, index) {
   const tokens = meaningfulTokens(query);
   const haystack = [
@@ -842,6 +852,17 @@ function KeywordInsightPanel({
             </button>
           ))}
         </div>
+      </div>
+      <div className="seo-checklist-notice">
+        <div>
+          <span>NOTICE</span>
+          <h3>영상 제작 전 SEO 체크리스트</h3>
+        </div>
+        <ul>
+          {preProductionSeoChecklist.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
       </div>
       <div className="grok-section tip">
         <h3>TIP. SEO 최적화 가이드</h3>
