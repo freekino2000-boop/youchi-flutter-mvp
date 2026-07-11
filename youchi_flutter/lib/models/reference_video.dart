@@ -41,6 +41,25 @@ class ReferenceVideo {
   final List<String> matchedTerms;
   final String? savedAt;
 
+  bool get isShortForm {
+    final text = [
+      source,
+      videoType,
+      originUrl,
+      title,
+      description,
+      category,
+      ...keywords,
+    ].whereType<String>().join(' ').toLowerCase();
+    return text.contains('tiktok') ||
+        text.contains('/shorts/') ||
+        RegExp(
+          r'(^|\s|#)(shorts|쇼츠)(\s|#|$)',
+          caseSensitive: false,
+        ).hasMatch(text) ||
+        (seconds > 0 && seconds <= 60);
+  }
+
   factory ReferenceVideo.fromJson(Map<String, dynamic> json) {
     return ReferenceVideo(
       id: '${json['id'] ?? ''}',

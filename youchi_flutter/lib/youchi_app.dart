@@ -15,6 +15,8 @@ enum YouchiMode { home, search, saved }
 
 enum SortType { related, latest, duration }
 
+enum ContentFormat { long, shorts }
+
 class YouchiApp extends StatelessWidget {
   const YouchiApp({super.key});
 
@@ -43,6 +45,7 @@ class _YouchiShellState extends State<YouchiShell> {
 
   YouchiMode _mode = YouchiMode.home;
   SortType _sort = SortType.related;
+  ContentFormat _contentFormat = ContentFormat.long;
   String _submittedQuery = '';
   bool _loading = false;
   String _error = '';
@@ -96,6 +99,7 @@ class _YouchiShellState extends State<YouchiShell> {
       _submittedQuery = query;
       _selected = null;
       _sort = SortType.related;
+      _contentFormat = ContentFormat.long;
     });
     try {
       final response = await _api.search(query);
@@ -136,6 +140,8 @@ class _YouchiShellState extends State<YouchiShell> {
       _submittedQuery = '';
       _selected = null;
       _error = '';
+      _sort = SortType.related;
+      _contentFormat = ContentFormat.long;
       _intent = [];
       _queryTerms = [];
       _insight = null;
@@ -148,6 +154,7 @@ class _YouchiShellState extends State<YouchiShell> {
       _selected = null;
       _error = '';
       _sort = SortType.related;
+      _contentFormat = ContentFormat.long;
     });
   }
 
@@ -164,7 +171,15 @@ class _YouchiShellState extends State<YouchiShell> {
   }
 
   List<ReferenceVideo> _visibleVideos() {
-    final videos = [...(_isSavedMode ? _saved : _results)];
+    final videos = [
+      ...(_isSavedMode
+          ? _saved
+          : _results.where(
+              (video) => _contentFormat == ContentFormat.shorts
+                  ? video.isShortForm
+                  : !video.isShortForm,
+            )),
+    ];
     switch (_sort) {
       case SortType.latest:
         videos.sort((a, b) => (b.year ?? 0).compareTo(a.year ?? 0));
@@ -178,6 +193,16 @@ class _YouchiShellState extends State<YouchiShell> {
         }
     }
     return videos;
+  }
+
+  Map<ContentFormat, int> _formatCounts() {
+    if (_isSavedMode) {
+      return {ContentFormat.long: 0, ContentFormat.shorts: 0};
+    }
+    return {
+      ContentFormat.long: _results.where((video) => !video.isShortForm).length,
+      ContentFormat.shorts: _results.where((video) => video.isShortForm).length,
+    };
   }
 
   @override
@@ -218,10 +243,16 @@ class _YouchiShellState extends State<YouchiShell> {
                           intent: _intent,
                           queryTerms: _queryTerms,
                           sort: _sort,
+                          contentFormat: _contentFormat,
+                          formatCounts: _formatCounts(),
                           error: _error,
                           isMobile: isMobile,
                           api: _api,
                           onSort: (sort) => setState(() => _sort = sort),
+                          onContentFormat: (format) => setState(() {
+                            _contentFormat = format;
+                            _selected = null;
+                          }),
                           onSubmit: _submitSearch,
                           onSelect: (video) =>
                               setState(() => _selected = video),
@@ -557,10 +588,13 @@ class _ResultsView extends StatelessWidget {
     required this.intent,
     required this.queryTerms,
     required this.sort,
+    required this.contentFormat,
+    required this.formatCounts,
     required this.error,
     required this.isMobile,
     required this.api,
     required this.onSort,
+    required this.onContentFormat,
     required this.onSubmit,
     required this.onSelect,
     required this.onToggleSaved,
@@ -579,10 +613,13 @@ class _ResultsView extends StatelessWidget {
   final List<String> intent;
   final List<String> queryTerms;
   final SortType sort;
+  final ContentFormat contentFormat;
+  final Map<ContentFormat, int> formatCounts;
   final String error;
   final bool isMobile;
   final YouchiApiClient api;
   final ValueChanged<SortType> onSort;
+  final ValueChanged<ContentFormat> onContentFormat;
   final Future<void> Function([String? query]) onSubmit;
   final ValueChanged<ReferenceVideo> onSelect;
   final ValueChanged<ReferenceVideo> onToggleSaved;
@@ -633,8 +670,11 @@ class _ResultsView extends StatelessWidget {
                         savedIds: savedIds,
                         selected: selected,
                         sort: sort,
+                        contentFormat: contentFormat,
+                        formatCounts: formatCounts,
                         error: error,
                         onSort: onSort,
+                        onContentFormat: onContentFormat,
                         onSelect: onSelect,
                         onToggleSaved: onToggleSaved,
                         onHome: onHome,
@@ -662,8 +702,11 @@ class _ResultsView extends StatelessWidget {
                           savedIds: savedIds,
                           selected: selected,
                           sort: sort,
+                          contentFormat: contentFormat,
+                          formatCounts: formatCounts,
                           error: error,
                           onSort: onSort,
+                          onContentFormat: onContentFormat,
                           onSelect: onSelect,
                           onToggleSaved: onToggleSaved,
                           onHome: onHome,
@@ -737,8 +780,11 @@ class _ReferenceSection extends StatelessWidget {
     required this.savedIds,
     required this.selected,
     required this.sort,
+    required this.contentFormat,
+    required this.formatCounts,
     required this.error,
     required this.onSort,
+    required this.onContentFormat,
     required this.onSelect,
     required this.onToggleSaved,
     required this.onHome,
@@ -750,8 +796,11 @@ class _ReferenceSection extends StatelessWidget {
   final Set<String> savedIds;
   final ReferenceVideo? selected;
   final SortType sort;
+  final ContentFormat contentFormat;
+  final Map<ContentFormat, int> formatCounts;
   final String error;
   final ValueChanged<SortType> onSort;
+  final ValueChanged<ContentFormat> onContentFormat;
   final ValueChanged<ReferenceVideo> onSelect;
   final ValueChanged<ReferenceVideo> onToggleSaved;
   final VoidCallback onHome;
@@ -766,7 +815,10 @@ class _ReferenceSection extends StatelessWidget {
           title: isSaved ? '저장된 보드' : query,
           count: videos.length,
           sort: sort,
+          contentFormat: contentFormat,
+          formatCounts: formatCounts,
           onSort: onSort,
+          onContentFormat: onContentFormat,
         ),
         const SizedBox(height: 22),
         if (videos.isEmpty)
@@ -824,14 +876,20 @@ class _ResultsHeader extends StatelessWidget {
     required this.title,
     required this.count,
     required this.sort,
+    required this.contentFormat,
+    required this.formatCounts,
     required this.onSort,
+    required this.onContentFormat,
   });
 
   final bool isSaved;
   final String title;
   final int count;
   final SortType sort;
+  final ContentFormat contentFormat;
+  final Map<ContentFormat, int> formatCounts;
   final ValueChanged<SortType> onSort;
+  final ValueChanged<ContentFormat> onContentFormat;
 
   @override
   Widget build(BuildContext context) {
@@ -882,6 +940,14 @@ class _ResultsHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 18),
+          if (!isSaved) ...[
+            _FormatToggle(
+              value: contentFormat,
+              counts: formatCounts,
+              onChanged: onContentFormat,
+            ),
+            const SizedBox(width: 12),
+          ],
           DropdownButton<SortType>(
             value: sort,
             dropdownColor: const Color(0xFF151316),
@@ -896,6 +962,97 @@ class _ResultsHeader extends StatelessWidget {
             },
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _FormatToggle extends StatelessWidget {
+  const _FormatToggle({
+    required this.value,
+    required this.counts,
+    required this.onChanged,
+  });
+
+  final ContentFormat value;
+  final Map<ContentFormat, int> counts;
+  final ValueChanged<ContentFormat> onChanged;
+
+  String _label(ContentFormat format) {
+    return switch (format) {
+      ContentFormat.long => '롱폼',
+      ContentFormat.shorts => '숏츠',
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0x44000000),
+        border: Border.all(color: YouchiColors.line),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final format in ContentFormat.values)
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: _FormatButton(
+                label: _label(format),
+                count: counts[format] ?? 0,
+                selected: value == format,
+                onTap: () => onChanged(format),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FormatButton extends StatelessWidget {
+  const _FormatButton({
+    required this.label,
+    required this.count,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final int count;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        decoration: BoxDecoration(
+          color: selected ? YouchiColors.accent : Colors.transparent,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: selected ? Colors.white : YouchiColors.faint,
+                fontWeight: FontWeight.w800,
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(width: 6),
+            _CountBadge('$count'),
+          ],
+        ),
       ),
     );
   }

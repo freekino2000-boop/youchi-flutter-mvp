@@ -15,6 +15,12 @@ import { references } from "./data";
 const API_BASE = "http://127.0.0.1:8787";
 const SAVED_BOARD_KEY = "youchi-saved-board";
 const LEGACY_SAVED_KEY = "reframe-saved";
+const DEFAULT_CONTENT_FORMAT = "long";
+
+const contentFormatLabels = {
+  long: "롱폼",
+  shorts: "숏츠",
+};
 
 const intentRules = [
   ["아웃도어", ["등산", "아웃도어", "캠핑", "트레킹", "하이킹", "등산화", "백팩"]],
@@ -119,6 +125,31 @@ function toSavedReference(reference) {
     hasEvidence: true,
     savedAt: new Date().toISOString(),
   };
+}
+
+function isShortFormReference(reference) {
+  const source = `${reference.source || ""} ${reference.videoType || ""}`.toLowerCase();
+  const originUrl = `${reference.originUrl || ""}`.toLowerCase();
+  const text = [
+    reference.title,
+    reference.description,
+    reference.category,
+    ...(reference.keywords || []),
+  ]
+    .join(" ")
+    .toLowerCase();
+  const seconds = Number(reference.seconds || 0);
+  return (
+    source.includes("tiktok") ||
+    originUrl.includes("/shorts/") ||
+    /(^|\s|#)(shorts|쇼츠)(\s|#|$)/i.test(text) ||
+    (seconds > 0 && seconds <= 60)
+  );
+}
+
+function filterByContentFormat(reference, format) {
+  if (format === "shorts") return isShortFormReference(reference);
+  return !isShortFormReference(reference);
 }
 
 function deriveIntent(query) {
@@ -831,6 +862,7 @@ export function App() {
   const [intent, setIntent] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [sort, setSort] = useState("related");
+  const [contentFormat, setContentFormat] = useState(DEFAULT_CONTENT_FORMAT);
   const [loading, setLoading] = useState(false);
   const [savedOnly, setSavedOnly] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
@@ -850,7 +882,7 @@ export function App() {
 
   const savedIds = useMemo(() => new Set(savedItems.map((item) => item.id)), [savedItems]);
 
-  const rankedResults = useMemo(() => {
+  const allRankedResults = useMemo(() => {
     if (savedOnly) {
       const ranked = [...savedItems];
       if (sort === "latest") ranked.sort((a, b) => (b.year || 0) - (a.year || 0));
@@ -873,6 +905,24 @@ export function App() {
     return ranked.filter((reference) => reference.hasEvidence);
   }, [apiResults, hasSearched, savedItems, savedOnly, searchMeta, sort, submittedQuery]);
 
+  const formatCounts = useMemo(() => {
+    if (savedOnly) return { long: 0, shorts: 0 };
+    return allRankedResults.reduce(
+      (counts, reference) => {
+        counts[isShortFormReference(reference) ? "shorts" : "long"] += 1;
+        return counts;
+      },
+      { long: 0, shorts: 0 },
+    );
+  }, [allRankedResults, savedOnly]);
+
+  const rankedResults = useMemo(() => {
+    if (savedOnly) return allRankedResults;
+    return allRankedResults
+      .filter((reference) => filterByContentFormat(reference, contentFormat))
+      .slice(0, 50);
+  }, [allRankedResults, contentFormat, savedOnly]);
+
   const selected =
     selectedId === null
       ? null
@@ -892,12 +942,13 @@ export function App() {
       const nextQuery = query.trim();
       setSubmittedQuery(nextQuery);
       setSort("related");
+      setContentFormat(DEFAULT_CONTENT_FORMAT);
       setSavedOnly(false);
       setSelectedId(null);
       setHasSearched(true);
       try {
         const response = await fetch(
-          `${API_BASE}/api/search?q=${encodeURIComponent(nextQuery)}&limit=50`,
+          `${API_BASE}/api/search?q=${encodeURIComponent(nextQuery)}&limit=120`,
         );
         if (!response.ok) throw new Error(`API ${response.status}`);
         const payload = await response.json();
@@ -926,6 +977,7 @@ export function App() {
   function toggleSavedOnly() {
     clearTimeout(searchTimer.current);
     setSelectedId(null);
+    setContentFormat(DEFAULT_CONTENT_FORMAT);
     setLoading(false);
     setSearchError("");
 
@@ -943,6 +995,11 @@ export function App() {
     setKeywordInsights(buildFallbackKeywordInsights("저장된 보드"));
   }
 
+  function selectContentFormat(format) {
+    setContentFormat(format);
+    setSelectedId(null);
+  }
+
   function goHome() {
     clearTimeout(searchTimer.current);
     setQuery("");
@@ -950,6 +1007,7 @@ export function App() {
     setIntent([]);
     setSelectedId(null);
     setSort("related");
+    setContentFormat(DEFAULT_CONTENT_FORMAT);
     setLoading(false);
     setSavedOnly(false);
     setHasSearched(false);
@@ -1142,6 +1200,21 @@ export function App() {
                       <option value="duration">짧은 영상순</option>
                     </select>
                   </label>
+                  {!savedOnly && (
+                    <div className="format-toggle" aria-label="영상 형식 선택">
+                      {Object.entries(contentFormatLabels).map(([format, label]) => (
+                        <button
+                          type="button"
+                          key={format}
+                          className={contentFormat === format ? "active" : ""}
+                          onClick={() => selectContentFormat(format)}
+                        >
+                          {label}
+                          <span>{formatCounts[format] || 0}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {rankedResults.length ? (

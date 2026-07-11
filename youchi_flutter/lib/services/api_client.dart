@@ -46,7 +46,7 @@ class YouchiApiClient {
 
   final String baseUrl;
 
-  Future<SearchResult> search(String query, {int limit = 50}) async {
+  Future<SearchResult> search(String query, {int limit = 120}) async {
     final uri = Uri.parse(
       '$baseUrl/api/search',
     ).replace(queryParameters: {'q': query, 'limit': '$limit'});
