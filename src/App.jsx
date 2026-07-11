@@ -901,12 +901,7 @@ export function App() {
         );
         if (!response.ok) throw new Error(`API ${response.status}`);
         const payload = await response.json();
-        setApiResults(
-          (payload.results || []).map((reference) => ({
-            ...reference,
-            source: "YOUCHI DB",
-          })),
-        );
+        setApiResults(payload.results || []);
         setSearchMeta({
           usedRemote: true,
           generatedAt: payload.generatedAt,

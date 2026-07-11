@@ -60,12 +60,6 @@ class YouchiApiClient {
         ? rawResults
               .whereType<Map<String, dynamic>>()
               .map(ReferenceVideo.fromJson)
-              .map(
-                (video) => ReferenceVideo.fromJson({
-                  ...video.toJson(),
-                  'source': 'YOUCHI DB',
-                }),
-              )
               .toList()
         : <ReferenceVideo>[];
     return SearchResult(

@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
+import { references as curatedReferences } from "./src/data.js";
 
 function loadLocalEnv() {
   const envPath = path.resolve(".env");
@@ -55,7 +56,28 @@ const genericSearchTerms = [
 const categoryAliases = [
   {
     label: "아웃도어",
-    terms: ["등산", "아웃도어", "캠핑", "백패킹", "차박", "트레킹", "하이킹", "클라이밍", "산행", "등산화", "배낭", "백팩"],
+    terms: [
+      "등산",
+      "등산용품",
+      "아웃도어",
+      "캠핑",
+      "백패킹",
+      "차박",
+      "트레킹",
+      "하이킹",
+      "클라이밍",
+      "산행",
+      "등산화",
+      "배낭",
+      "백팩",
+      "고어텍스",
+      "텐트",
+      "랜턴",
+      "스틱",
+      "재킷",
+      "자켓",
+      "장비",
+    ],
   },
   {
     label: "뷰티",
@@ -73,6 +95,40 @@ const categoryAliases = [
     label: "패션",
     terms: ["패션", "코디", "하울", "스니커즈", "시계", "주얼리"],
   },
+];
+
+const sourceLabels = {
+  youtube: "YouTube",
+  "youtube db": "YouTube",
+  tvcf: "TVCF",
+  "비드폴리오": "비드폴리오",
+  "드롭샷": "드롭샷",
+  tiktok: "TikTok",
+};
+
+const productTerms = [
+  "제품",
+  "용품",
+  "장비",
+  "브랜드",
+  "리뷰",
+  "후기",
+  "구매",
+  "추천",
+  "신발",
+  "등산화",
+  "배낭",
+  "백팩",
+  "텐트",
+  "랜턴",
+  "스틱",
+  "재킷",
+  "자켓",
+  "의류",
+  "광고",
+  "소재",
+  "캠페인",
+  "숏폼",
 ];
 
 function tokenize(text) {
@@ -116,7 +172,15 @@ function expandTokens(tokens) {
 
 function buildQueryProfile(query) {
   const baseTokens = meaningfulTokens(query);
-  const expandedTokens = expandTokens(baseTokens);
+  const compactQuery = compactText(query);
+  const aliasTokens = categoryAliases.flatMap((group) =>
+    group.terms.filter((term) => compactQuery.includes(compactText(term))),
+  );
+  const productIntentTokens = productTerms.filter((term) =>
+    compactQuery.includes(compactText(term)),
+  );
+  const queryTokens = unique([...baseTokens, ...aliasTokens, ...productIntentTokens]);
+  const expandedTokens = expandTokens(queryTokens);
   const chunks = String(query || "")
     .toLowerCase()
     .split(/[,，\n/|+·ㆍ]+/u)
@@ -124,13 +188,16 @@ function buildQueryProfile(query) {
     .filter((chunk) => chunk.length > 1);
   const adjacentPhrases = [];
   for (let size = 2; size <= 3; size += 1) {
-    for (let index = 0; index <= baseTokens.length - size; index += 1) {
-      adjacentPhrases.push(baseTokens.slice(index, index + size).join(" "));
+    for (let index = 0; index <= queryTokens.length - size; index += 1) {
+      adjacentPhrases.push(queryTokens.slice(index, index + size).join(" "));
     }
   }
 
   return {
-    baseTokens,
+    baseTokens: queryTokens,
+    originalTokens: baseTokens,
+    aliasTokens,
+    productIntentTokens,
     expandedTokens,
     phrases: unique([...chunks, ...adjacentPhrases]).slice(0, 18),
     intents: searchIntent(query),
@@ -147,7 +214,7 @@ function tokenEvidence(reference, token) {
 
   if (!lowered) return null;
   if (title.includes(lowered)) return { token, field: "title", weight: 24 };
-  if (keywords.some((keyword) => keyword.includes(lowered) || lowered.includes(keyword))) {
+  if (keywords.some((keyword) => keyword.includes(lowered))) {
     return { token, field: "keyword", weight: 20 };
   }
   if (category.includes(lowered)) return { token, field: "category", weight: 14 };
@@ -301,6 +368,7 @@ async function buildGrokKeywordInsights(query, topCandidates) {
 function buildHaystack(reference) {
   return [
     reference.title,
+    reference.source,
     reference.channel,
     reference.category,
     reference.description,
@@ -310,9 +378,123 @@ function buildHaystack(reference) {
     .toLowerCase();
 }
 
+function normalizeSource(source) {
+  const raw = String(source || "YouTube").trim();
+  const key = raw.toLowerCase();
+  return sourceLabels[key] || raw.replace(" DB", "");
+}
+
+function normalizeReference(reference, fallbackSource = "YouTube") {
+  const keywords = unique(reference.keywords || []);
+  return {
+    ...reference,
+    source: normalizeSource(reference.source || fallbackSource),
+    category: reference.category || inferCategory(keywords),
+    keywords,
+    views: Number(reference.views || 0),
+    seconds: Number(reference.seconds || 0),
+    year: Number(reference.year || 0) || undefined,
+  };
+}
+
+function inferCategory(keywords) {
+  const joined = keywords.join(" ");
+  for (const group of categoryAliases) {
+    if (group.terms.some((term) => joined.includes(term))) return group.label;
+  }
+  return keywords[0] || "광고 레퍼런스";
+}
+
+function tiktokImageForIntent(intents) {
+  if (intents.includes("아웃도어")) {
+    return "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=900&q=80";
+  }
+  if (intents.includes("뷰티")) {
+    return "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?auto=format&fit=crop&w=900&q=80";
+  }
+  if (intents.includes("패션")) {
+    return "https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=900&q=80";
+  }
+  if (intents.includes("푸드")) {
+    return "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=900&q=80";
+  }
+  return "https://images.unsplash.com/photo-1611162616305-c69b3fa7fbe0?auto=format&fit=crop&w=900&q=80";
+}
+
+function buildTikTokSearchReferences(query, queryProfile) {
+  const trimmed = query.trim();
+  if (!trimmed) return [];
+  const terms = unique([
+    trimmed,
+    ...queryProfile.baseTokens,
+    ...queryProfile.expandedTokens.slice(0, 4),
+    "광고",
+    "숏폼",
+    "틱톡",
+  ]).slice(0, 12);
+  const searchQuery = unique([trimmed, "광고", "숏폼", "레퍼런스"]).join(" ");
+  return [
+    normalizeReference(
+      {
+        id: `tiktok-search-${Buffer.from(trimmed).toString("base64url").slice(0, 28)}`,
+        title: `TikTok 검색: ${trimmed} 숏폼 광고 레퍼런스`,
+        source: "TikTok",
+        channel: "TikTok Search",
+        category: queryProfile.intents[0] || "숏폼",
+        image: tiktokImageForIntent(queryProfile.intents),
+        originUrl: `https://www.tiktok.com/search?q=${encodeURIComponent(searchQuery)}`,
+        videoType: "external",
+        duration: "검색",
+        seconds: 0,
+        year: new Date().getFullYear(),
+        keywords: terms,
+        reason: "TikTok에서 같은 키워드의 숏폼 광고·UGC 레퍼런스를 추가 탐색하는 검색 링크입니다.",
+        description:
+          "TikTok 공식 검색 페이지로 이동해 최신 숏폼 레퍼런스를 확인합니다. MVP에서는 검색 링크로 연결하고, 운영에서는 허용된 API/커넥터로 메타데이터 수집을 대체합니다.",
+        moments: [
+          {
+            time: "TikTok",
+            label: "숏폼 검색 결과",
+            image: tiktokImageForIntent(queryProfile.intents),
+          },
+        ],
+      },
+      "TikTok",
+    ),
+  ];
+}
+
+function sourceBoost(reference, query) {
+  const source = normalizeSource(reference.source);
+  const adIntent = /광고|소재|캠페인|레퍼런스|숏폼|틱톡|tiktok/i.test(query);
+  if (source === "TVCF") return adIntent ? 18 : 10;
+  if (source === "비드폴리오") return adIntent ? 17 : 9;
+  if (source === "드롭샷") return adIntent ? 15 : 8;
+  if (source === "TikTok") return adIntent ? 14 : 6;
+  return 0;
+}
+
+function sourceSummary(results) {
+  return results.reduce((summary, reference) => {
+    const source = normalizeSource(reference.source);
+    summary[source] = (summary[source] || 0) + 1;
+    return summary;
+  }, {});
+}
+
+function sourceSortRank(reference) {
+  const source = normalizeSource(reference.source);
+  if (source === "TVCF") return 50;
+  if (source === "비드폴리오") return 48;
+  if (source === "드롭샷") return 45;
+  if (source === "TikTok") return 42;
+  return 0;
+}
+
 function score(reference, query, index) {
   const profile = buildQueryProfile(query);
-  const { baseTokens, expandedTokens, phrases, intents } = profile;
+  const { baseTokens, expandedTokens, phrases, intents, productIntentTokens } = profile;
+  const source = normalizeSource(reference.source);
   const haystack = buildHaystack(reference);
   const compactHaystack = compactText(haystack);
   const titleText = String(reference.title || "").toLowerCase();
@@ -325,7 +507,7 @@ function score(reference, query, index) {
     .toLowerCase();
   const productIntent = /제품|용품|장비|브랜드|리뷰|후기|구매|추천|신발|등산화|배낭|백팩|텐트|랜턴|스틱|재킷|자켓|의류/.test(
     query,
-  );
+  ) || productIntentTokens.length > 0;
   const directEvidence = unique(baseTokens.map((token) => tokenEvidence(reference, token))).filter(Boolean);
   const matched = unique(directEvidence.map((evidence) => evidence.token));
   const expandedMatched = unique(
@@ -335,13 +517,23 @@ function score(reference, query, index) {
   const coverage = baseTokens.length ? matched.length / baseTokens.length : 0;
   const categoryMatch = intents.some((intent) => {
     if (intent === "아웃도어") {
-      return /등산|캠핑|백패킹|차박|아웃도어|트레킹|하이킹|클라이밍/.test(
-        String(reference.category || ""),
+      return /등산|캠핑|백패킹|차박|아웃도어|트레킹|하이킹|클라이밍|등산화|배낭|백팩|고어텍스|텐트|랜턴|스틱|낚시/.test(
+        [
+          reference.title,
+          reference.category,
+          reference.description,
+          ...(reference.keywords || []),
+        ].join(" "),
       );
     }
-    return String(reference.category || "").includes(intent);
+    return [
+      reference.title,
+      reference.category,
+      reference.description,
+      ...(reference.keywords || []),
+    ].join(" ").includes(intent);
   });
-  const productSignal = /리뷰|후기|사용기|장비|브랜드|구매|언박싱|아울렛|기능성|추천|등산화|배낭|백팩|텐트|쉘터|랜턴|스틱|착용|재킷|자켓|고어텍스|방수/.test(
+  const productSignal = /리뷰|후기|사용기|제품|용품|장비|브랜드|구매|언박싱|아울렛|기능성|추천|등산화|배낭|백팩|텐트|쉘터|랜턴|스틱|착용|재킷|자켓|고어텍스|방수/.test(
     productHaystack,
   );
   const evidenceScore = directEvidence.reduce((sum, evidence) => sum + evidence.weight, 0);
@@ -349,10 +541,16 @@ function score(reference, query, index) {
   const expandedScore = Math.min(18, expandedMatched.length * 4);
   const coverageScore = Math.round(coverage * 28);
   const lowCoveragePenalty = baseTokens.length >= 3 && coverage < 0.34 ? 22 : 0;
-  const categoryIntentPenalty = intents.length > 0 && !categoryMatch && coverage < 0.6 ? 28 : 0;
+  const categoryIntentPenalty = intents.length > 0 && !categoryMatch && coverage < 0.6 ? 42 : 0;
+  const longFormPenalty = productIntent && reference.seconds > 900 ? 14 : 0;
+  const noProductSignalPenalty = productIntent && !productSignal ? 18 : 0;
+  const productMatched = [...matched, ...phraseMatched].some((term) =>
+    /제품|용품|장비|리뷰|후기|구매|추천|등산화|배낭|백팩|텐트|쉘터|랜턴|스틱|재킷|자켓/.test(term),
+  );
 
   if (!matched.length && !categoryMatch && !expandedMatched.length && !phraseMatched.length) return null;
   if (baseTokens.length >= 3 && coverage < 0.2 && !phraseMatched.length && !categoryMatch) return null;
+  if (productIntent && source === "YouTube" && !productSignal && !productMatched) return null;
 
   const viewScore = Math.min(10, Math.log10((reference.views || 0) + 1) * 1.5);
   const rawMatch =
@@ -364,26 +562,29 @@ function score(reference, query, index) {
         (categoryMatch ? 18 : 0) +
         (titleText.includes(baseTokens[0] || "") ? 8 : 0) +
         (productIntent && productSignal ? 12 : 0) +
-        (productIntent && !productSignal ? -16 : 0) +
         (!productIntent && productSignal ? 4 : 0) +
+        sourceBoost(reference, query) +
         viewScore -
         lowCoveragePenalty -
         categoryIntentPenalty -
+        noProductSignalPenalty -
+        longFormPenalty -
         index * 0.001;
-  const match = Math.round(Math.min(98, intents.length > 0 && !categoryMatch ? Math.min(rawMatch, 82) : rawMatch));
+  const match = Math.round(Math.min(98, intents.length > 0 && !categoryMatch ? Math.min(rawMatch, 64) : rawMatch));
+  if (match < 35) return null;
   const displayMatches = unique([...matched, ...phraseMatched, ...expandedMatched]).slice(0, 10);
 
   return {
     ...reference,
-    source: "YOUCHI DB",
+    source,
     match,
     matchedTerms: displayMatches,
     queryCoverage: Math.round(coverage * 100),
     hasEvidence: true,
     reason:
       displayMatches.length > 0
-        ? `${displayMatches.slice(0, 4).join(", ")} 조합과 연결된 실제 유튜브 레퍼런스입니다.`
-        : `${reference.category} 카테고리와 연결된 실제 유튜브 레퍼런스입니다.`,
+        ? `${displayMatches.slice(0, 4).join(", ")} 조합과 연결된 ${source} 레퍼런스입니다.`
+        : `${reference.category} 카테고리와 연결된 ${source} 레퍼런스입니다.`,
   };
 }
 
@@ -664,6 +865,13 @@ try {
   throw error;
 }
 
+const indexedReferences = (index.references || []).map((reference) =>
+  normalizeReference(reference, "YouTube"),
+);
+const curatedSearchReferences = curatedReferences.map((reference) =>
+  normalizeReference(reference, reference.source || "External"),
+);
+
 const server = http.createServer((request, response) => {
   if (request.method === "OPTIONS") {
     sendJson(response, 200, { ok: true });
@@ -675,7 +883,10 @@ const server = http.createServer((request, response) => {
   if (url.pathname === "/api/health") {
     sendJson(response, 200, {
       ok: true,
-      count: index.count,
+      count: indexedReferences.length + curatedSearchReferences.length,
+      youtubeCount: indexedReferences.length,
+      curatedCount: curatedSearchReferences.length,
+      dynamicSources: ["TikTok"],
       generatedAt: index.generatedAt,
       grokConfigured: Boolean(XAI_API_KEY),
       grokModel: XAI_API_KEY ? XAI_MODEL : null,
@@ -694,18 +905,30 @@ const server = http.createServer((request, response) => {
       return;
     }
     const queryProfile = buildQueryProfile(query);
+    const tiktokReferences = buildTikTokSearchReferences(query, queryProfile);
+    const searchPool = [
+      ...curatedSearchReferences,
+      ...tiktokReferences,
+      ...indexedReferences,
+    ];
 
-    const results = index.references
+    const results = searchPool
       .map((reference, idx) => score(reference, query, idx))
       .filter(Boolean)
-      .sort((a, b) => b.match - a.match || (b.views || 0) - (a.views || 0))
+      .sort(
+        (a, b) =>
+          b.match - a.match ||
+          sourceSortRank(b) - sourceSortRank(a) ||
+          (b.views || 0) - (a.views || 0),
+      )
       .slice(0, limit);
 
     buildGrokKeywordInsights(query, results).then((insights) => {
       sendJson(response, 200, {
         query,
         count: results.length,
-        totalIndexed: index.count,
+        totalIndexed: searchPool.length,
+        sourceSummary: sourceSummary(results),
         generatedAt: index.generatedAt,
         intent: queryProfile.intents,
         queryTerms: unique([
