@@ -1,0 +1,141 @@
+export const references = [
+  {
+    id: "vidfolio-laneige-tint",
+    title: "화장품 틴트 신제품 런칭 캠페인 | 라네즈",
+    source: "비드폴리오",
+    image:
+      "https://vidfolio.kr/wp-content/uploads/2026/06/8220-tint-your-mood-8221-l-L0qd6eeCp3g.jpg",
+    originUrl: "https://vidfolio.kr/?p=179429",
+    videoType: "youtube",
+    videoUrl: "https://www.youtube.com/embed/L0qd6eeCp3g",
+    duration: "03:16",
+    seconds: 196,
+    year: 2026,
+    keywords: [
+      "화장품",
+      "뷰티",
+      "라네즈",
+      "틴트",
+      "20대",
+      "여성",
+      "제품",
+      "컬러",
+      "셀럽",
+      "뮤직비디오",
+    ],
+    reason: "실제 라네즈 신제품 캠페인으로 컬러와 인물 중심의 연출이 유사합니다.",
+    description:
+      "비드폴리오에 공개된 라네즈 아모레퍼시픽의 실제 신제품 런칭 캠페인입니다. 셀럽, 컬러, 제품 클로즈업을 함께 비교할 수 있습니다.",
+    moments: [
+      { time: "00:18", label: "제품 컬러 공개", image: "https://img.youtube.com/vi/L0qd6eeCp3g/mqdefault.jpg" },
+      { time: "01:06", label: "아티스트 퍼포먼스", image: "https://img.youtube.com/vi/L0qd6eeCp3g/hqdefault.jpg" },
+      { time: "02:41", label: "제품 히어로 컷", image: "https://img.youtube.com/vi/L0qd6eeCp3g/sddefault.jpg" },
+    ],
+  },
+  {
+    id: "tvcf-laneige-water-bank",
+    title: "라네즈 워터뱅크 에센스: Thirst for life",
+    source: "TVCF",
+    image: "https://nmedia.tvcf.co.kr/media/print/0000405/A000405717D265.jpg",
+    originUrl: "https://tvcf.co.kr/ko/play/ah06443-785192",
+    videoType: "hls",
+    videoUrl:
+      "https://wowza.tvcf.co.kr:1443/vod/_definst_/mp4:0000405/A000405717D265_720p.mp4/playlist.m3u8",
+    duration: "00:30",
+    seconds: 30,
+    year: 2020,
+    keywords: ["화장품", "뷰티", "라네즈", "워터뱅크", "수분", "여성", "자연", "청량"],
+    reason: "수분 콘셉트와 자연을 연결한 실제 라네즈 광고입니다.",
+    description:
+      "TVCF가 공개한 실제 라네즈 워터뱅크 에센스 광고입니다. 제품 효능을 자연의 갈증과 연결하는 메시지와 영상 톤을 확인할 수 있습니다.",
+    moments: [
+      { time: "00:05", label: "자연 콘셉트 도입", image: "https://nmedia.tvcf.co.kr/media/print/0000405/A000405717D265.jpg" },
+      { time: "00:16", label: "인물 감정 전환", image: "https://nmedia.tvcf.co.kr/media/print/0000405/A000405717D265.jpg" },
+      { time: "00:26", label: "브랜드 메시지", image: "https://nmedia.tvcf.co.kr/media/print/0000405/A000405717D265.jpg" },
+    ],
+  },
+  {
+    id: "dropshot-glass-skin-shampoo",
+    title: "유리피부 | 샴푸 제품 영상",
+    source: "드롭샷",
+    image:
+      "https://video.match.dropshot.io/11f17b6a-70b5-e48f-ab4d-0acfc27e17c2/poster_lg.png",
+    originUrl: "https://match.dropshot.io/portfolio/s0n8ZDdygpCbmbNqDk8m",
+    videoType: "external",
+    duration: "02:27",
+    seconds: 147,
+    year: 2026,
+    keywords: ["뷰티", "샴푸", "제품", "모델", "사용", "헤어", "자연광"],
+    reason: "실제 샴푸 제품 사용 장면과 모델 중심의 뷰티 연출 사례입니다.",
+    description:
+      "드롭샷에 공개된 실제 뷰티 포트폴리오입니다. 공개 페이지 정책상 영상은 원본 상세 페이지에서 재생됩니다.",
+    moments: [
+      { time: "00:12", label: "제품 사용 도입", image: "https://video.match.dropshot.io/11f17b6a-70b5-e48f-ab4d-0acfc27e17c2/poster_lg.png" },
+      { time: "01:03", label: "헤어 텍스처", image: "https://video.match.dropshot.io/11f17b6a-70b5-e48f-ab4d-0acfc27e17c2/poster_lg.png" },
+      { time: "02:14", label: "제품 엔딩", image: "https://video.match.dropshot.io/11f17b6a-70b5-e48f-ab4d-0acfc27e17c2/poster_lg.png" },
+    ],
+  },
+  {
+    id: "dropshot-clinical-test",
+    title: "헤어 제품 홈쇼핑 인서트 | 임상테스트",
+    source: "드롭샷",
+    image:
+      "https://video.match.dropshot.io/11f17b68-b4b6-11e0-ab4d-0acfc27e17c2/poster_lg.png",
+    originUrl: "https://match.dropshot.io/portfolio/D0wAXgUfzuJ0mA2uzc1q",
+    videoType: "external",
+    duration: "01:45",
+    seconds: 105,
+    year: 2026,
+    keywords: ["뷰티", "헤어", "제품", "임상", "효능", "정보", "홈쇼핑"],
+    reason: "제품 효능을 임상 데이터와 함께 전달하는 실제 영상 사례입니다.",
+    description:
+      "드롭샷에 공개된 실제 헤어 제품 임상테스트 포트폴리오입니다. 원본 상세 페이지에서 전체 영상을 확인할 수 있습니다.",
+    moments: [
+      { time: "00:09", label: "문제 상황 제시", image: "https://video.match.dropshot.io/11f17b68-b4b6-11e0-ab4d-0acfc27e17c2/poster_lg.png" },
+      { time: "00:48", label: "임상 결과 설명", image: "https://video.match.dropshot.io/11f17b68-b4b6-11e0-ab4d-0acfc27e17c2/poster_lg.png" },
+      { time: "01:31", label: "효능 요약", image: "https://video.match.dropshot.io/11f17b68-b4b6-11e0-ab4d-0acfc27e17c2/poster_lg.png" },
+    ],
+  },
+  {
+    id: "dropshot-brand-story",
+    title: "헤어 제품 홈쇼핑 인서트 | 브랜드 스토리",
+    source: "드롭샷",
+    image:
+      "https://video.match.dropshot.io/11f17b68-81aa-2572-ab4d-0acfc27e17c2/poster_lg.png",
+    originUrl: "https://match.dropshot.io/portfolio/8INAYywXnO6nREIORR7D",
+    videoType: "external",
+    duration: "01:18",
+    seconds: 78,
+    year: 2026,
+    keywords: ["뷰티", "헤어", "브랜드", "스토리", "감성", "제품", "홈쇼핑"],
+    reason: "브랜드 배경과 제품 가치를 감성적으로 연결한 실제 사례입니다.",
+    description:
+      "드롭샷의 실제 브랜드 스토리형 헤어 제품 포트폴리오입니다. 원본 페이지의 영상을 직접 열어볼 수 있습니다.",
+    moments: [
+      { time: "00:07", label: "브랜드 배경", image: "https://video.match.dropshot.io/11f17b68-81aa-2572-ab4d-0acfc27e17c2/poster_lg.png" },
+      { time: "00:39", label: "제품 철학", image: "https://video.match.dropshot.io/11f17b68-81aa-2572-ab4d-0acfc27e17c2/poster_lg.png" },
+      { time: "01:09", label: "브랜드 엔딩", image: "https://video.match.dropshot.io/11f17b68-81aa-2572-ab4d-0acfc27e17c2/poster_lg.png" },
+    ],
+  },
+  {
+    id: "dropshot-hair-insert",
+    title: "헤어 제품 홈쇼핑 인서트",
+    source: "드롭샷",
+    image:
+      "https://video.match.dropshot.io/11f17b68-447a-8796-ab4d-0acfc27e17c2/poster_lg.png",
+    originUrl: "https://match.dropshot.io/portfolio/3OlQCjgDVdMaaxjYWLZo",
+    videoType: "external",
+    duration: "01:11",
+    seconds: 71,
+    year: 2026,
+    keywords: ["뷰티", "헤어", "제품", "홈쇼핑", "설명", "사용", "효능"],
+    reason: "제품 사용법과 효능을 압축한 실제 커머스 영상입니다.",
+    description:
+      "드롭샷에 공개된 실제 헤어 제품 홈쇼핑 인서트입니다. 원본 링크에서 전체 재생과 제작 정보를 확인할 수 있습니다.",
+    moments: [
+      { time: "00:05", label: "제품 오프닝", image: "https://video.match.dropshot.io/11f17b68-447a-8796-ab4d-0acfc27e17c2/poster_lg.png" },
+      { time: "00:34", label: "사용 방법", image: "https://video.match.dropshot.io/11f17b68-447a-8796-ab4d-0acfc27e17c2/poster_lg.png" },
+      { time: "01:02", label: "CTA 마무리", image: "https://video.match.dropshot.io/11f17b68-447a-8796-ab4d-0acfc27e17c2/poster_lg.png" },
+    ],
+  },
+];
