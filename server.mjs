@@ -252,19 +252,18 @@ function buildLocalKeywordInsights(query) {
   ];
 
   return {
-    provider: XAI_API_KEY ? "Grok fallback" : "YOUCHI 로컬 확장",
-    status: XAI_API_KEY ? "Grok 응답 실패 시 로컬 제안" : "Grok API 키 연결 전",
+    provider: "YOUCHI SEO",
+    status: "SEO 추천",
     headline: `${query.trim()} 구글 SEO 최적화 추천`,
     summary:
       intents.length > 0
         ? `SEO 최적화를 추천합니다. ${primaryIntent} 관련 키워드와 영상 방향성을 바탕으로 구글 검색 노출에 유리한 키워드와 제목을 제안합니다.`
         : "SEO 최적화를 추천합니다. 실제 관련 키워드와 영상 방향성을 바탕으로 구글 검색 노출에 유리한 키워드와 제목을 제안합니다.",
-    keywords: [...new Set(keywordPool)].filter(Boolean).slice(0, 12),
+    keywords: [...new Set(keywordPool)].filter(Boolean).slice(0, 6),
     angles: [
-      `${query.trim()} 광고 사례와 제작 방향`,
-      `${primaryIntent} 제품 추천 영상 레퍼런스`,
-      `${primaryIntent} 브랜드 영상 SEO 제목 예시`,
-      `구매 전환을 높이는 ${primaryIntent} 영상 키워드`,
+      `${query.trim()}｜고객이 바로 이해하는 ${primaryIntent} 광고 레퍼런스`,
+      `${primaryIntent} 제품 사용 장면으로 보는 ${query.trim()} 제작 아이디어`,
+      `${query.trim()} 광고 제목 추천: 방문과 구매를 유도하는 영상 구성`,
     ],
     avoid: ["검색 의도와 다른 제품군 키워드 남발", "뷰티·패션 등 이종 카테고리 과매칭", "제목에 실제 영상 내용과 다른 과장 키워드 사용"],
     fromGrok: false,
@@ -306,15 +305,15 @@ async function buildGrokKeywordInsights(query, topCandidates) {
             role: "user",
             content: JSON.stringify({
               task:
-                "사용자 검색어와 YOUCHI DB 상위 후보를 보고 구글 SEO 최적화를 위한 관련 키워드, 영상 방향성에 맞는 추천 제목, 피해야 할 SEO 방향을 제안해줘. 이미지나 영상을 생성하지 말고 텍스트 JSON만 반환해.",
+                "사용자 검색어와 YOUCHI DB 상위 후보를 보고 실제 영상에 사용할 수 있는 구글 SEO 최적화 제목 샘플 3개, 키워드 검색용 추천 키워드 5~6개, 피해야 할 SEO 방향 3개를 제안해줘. 이미지나 영상을 생성하지 말고 텍스트 JSON만 반환해.",
               query,
               candidates,
               schema: {
                 headline: "string",
                 summary: "SEO 최적화를 추천합니다로 시작하는 string",
-                keywords: ["구글 SEO용 관련 키워드 string"],
-                angles: ["구글 검색 노출을 고려한 추천 영상 제목 string"],
-                avoid: ["피해야 할 SEO 방향 string"],
+                keywords: ["구글 SEO 검색용 추천 키워드 string, 총 5~6개"],
+                angles: ["실제 영상에 사용 가능한 SEO 최적화 제목 string, 정확히 3개"],
+                avoid: ["피해야 할 SEO 방향 TIP string, 정확히 3개"],
               },
             }),
           },
@@ -329,9 +328,6 @@ async function buildGrokKeywordInsights(query, topCandidates) {
       try {
         const errorPayload = JSON.parse(errorText);
         safeReason = errorPayload.code || errorPayload.error || safeReason;
-        if (/credits|licenses/i.test(errorPayload.error || "")) {
-          safeReason = "크레딧 또는 라이선스 필요";
-        }
       } catch {
         safeReason = errorText.slice(0, 80);
       }
@@ -342,23 +338,21 @@ async function buildGrokKeywordInsights(query, topCandidates) {
     const parsed = JSON.parse(content);
 
     return {
-      provider: "Grok AI",
-      status: `${XAI_MODEL} 제안`,
+      provider: "YOUCHI SEO",
+      status: "SEO 추천",
       headline: parsed.headline || fallback.headline,
       summary: parsed.summary || fallback.summary,
-      keywords: Array.isArray(parsed.keywords) ? parsed.keywords.slice(0, 12) : fallback.keywords,
-      angles: Array.isArray(parsed.angles) ? parsed.angles.slice(0, 6) : fallback.angles,
-      avoid: Array.isArray(parsed.avoid) ? parsed.avoid.slice(0, 5) : fallback.avoid,
+      keywords: Array.isArray(parsed.keywords) ? parsed.keywords.slice(0, 6) : fallback.keywords,
+      angles: Array.isArray(parsed.angles) ? parsed.angles.slice(0, 3) : fallback.angles,
+      avoid: Array.isArray(parsed.avoid) ? parsed.avoid.slice(0, 3) : fallback.avoid,
       fromGrok: true,
     };
   } catch (error) {
     console.warn(`[YOUCHI API] Grok request failed: ${error.message}`);
     return {
       ...fallback,
-      provider: "Grok fallback",
-      status: error.message.includes("크레딧")
-        ? "Grok 크레딧 필요 · 로컬 제안"
-        : "Grok 호출 실패 · 로컬 제안",
+      provider: "YOUCHI SEO",
+      status: "SEO 추천",
     };
   } finally {
     clearTimeout(timeout);

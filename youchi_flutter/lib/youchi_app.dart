@@ -1247,7 +1247,7 @@ class _KeywordPanel extends StatelessWidget {
         insight ??
         KeywordInsight.fromJson({
           'provider': 'YOUCHI',
-          'status': '대기 중',
+          'status': 'SEO 추천',
           'headline': 'SEO 키워드·제목 추천',
           'summary': 'SEO 최적화를 추천합니다. 검색어를 입력하면 구글 검색 노출에 유리한 키워드와 제목이 표시됩니다.',
           'keywords': <String>[],
@@ -1255,6 +1255,11 @@ class _KeywordPanel extends StatelessWidget {
           'avoid': <String>[],
           'fromGrok': false,
         });
+    final seoTips = [
+      '"$query"처럼 핵심 키워드는 제목 앞쪽에 배치하세요.',
+      '제품군, 사용 상황, 기대 효과를 한 문장 안에 함께 넣으면 검색 의도가 더 선명해집니다.',
+      '영상 썸네일·제목·설명 첫 문장의 키워드를 같은 방향으로 맞추면 SEO 일관성이 좋아집니다.',
+    ];
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: glassDecoration(radius: 0, color: const Color(0x66131315)),
@@ -1289,7 +1294,6 @@ class _KeywordPanel extends StatelessWidget {
                   ],
                 ),
               ),
-              _MiniPill(data.fromGrok ? 'Grok 연결됨' : data.status),
             ],
           ),
           const SizedBox(height: 18),
@@ -1317,19 +1321,36 @@ class _KeywordPanel extends StatelessWidget {
             data.summary,
             style: const TextStyle(color: YouchiColors.muted, height: 1.65),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 18),
+          _BulletSection(
+            title: 'SEO 최적화 제목 샘플 3개',
+            items: data.angles.take(3).toList(),
+          ),
+          const SizedBox(height: 18),
+          const Text(
+            '키워드 검색 추천 5–6개',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 10),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: [
-              for (final keyword in data.keywords.take(12))
+              for (final keyword in data.keywords.take(6))
                 _ChipButton(label: keyword, onTap: () => onKeyword(keyword)),
             ],
           ),
           const SizedBox(height: 18),
-          _BulletSection(title: '추천 제목', items: data.angles),
+          _BulletSection(title: 'TIP. SEO 최적화 가이드', items: seoTips),
           const SizedBox(height: 18),
-          _BulletSection(title: '피해야 할 SEO 방향', items: data.avoid),
+          _BulletSection(
+            title: 'TIP. 피해야 할 사항',
+            items: data.avoid.take(3).toList(),
+          ),
           const SizedBox(height: 20),
           _ProductionFlow(
             query: query,

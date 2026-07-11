@@ -186,16 +186,15 @@ function buildFallbackKeywordInsights(query) {
 
   return {
     provider: "YOUCHI 로컬 확장",
-    status: "Grok API 키 연결 전",
+    status: "SEO 추천",
     headline: `${query.trim()} 구글 SEO 최적화 추천`,
     summary:
       "SEO 최적화를 추천합니다. 실제 관련 키워드와 영상 방향성을 바탕으로 구글 검색 노출에 유리한 키워드와 제목을 제안합니다.",
-    keywords: [...new Set(defaultKeywords)].filter(Boolean).slice(0, 12),
+    keywords: [...new Set(defaultKeywords)].filter(Boolean).slice(0, 6),
     angles: [
-      `${primaryIntent} 제품 추천 영상 레퍼런스`,
-      `${query.trim()} 광고 사례와 제작 방향`,
-      `${primaryIntent} 브랜드 영상 SEO 제목 예시`,
-      `구매 전환을 높이는 ${primaryIntent} 영상 키워드`,
+      `${query.trim()}｜고객이 바로 이해하는 ${primaryIntent} 광고 레퍼런스`,
+      `${primaryIntent} 제품 사용 장면으로 보는 ${query.trim()} 제작 아이디어`,
+      `${query.trim()} 광고 제목 추천: 방문과 구매를 유도하는 영상 구성`,
     ],
     avoid: [
       "검색 의도와 다른 제품군 키워드 남발",
@@ -204,6 +203,15 @@ function buildFallbackKeywordInsights(query) {
     ],
     fromGrok: false,
   };
+}
+
+function buildSeoGuideTips(query) {
+  const trimmed = query.trim() || "핵심 키워드";
+  return [
+    `"${trimmed}"처럼 핵심 키워드는 제목 앞쪽에 배치하세요.`,
+    "제품군, 사용 상황, 기대 효과를 한 문장 안에 함께 넣으면 검색 의도가 더 선명해집니다.",
+    "영상 썸네일·제목·설명 첫 문장의 키워드를 같은 방향으로 맞추면 SEO 일관성이 좋아집니다.",
+  ];
 }
 
 function scoreReference(reference, query, index) {
@@ -801,6 +809,7 @@ function KeywordInsightPanel({
   selectedReference,
 }) {
   const data = insights || buildFallbackKeywordInsights(query);
+  const seoGuideTips = buildSeoGuideTips(query);
 
   return (
     <aside className="grok-panel" aria-label="구글 SEO 키워드와 제목 추천">
@@ -810,34 +819,42 @@ function KeywordInsightPanel({
           <span className="eyebrow">Google SEO insight</span>
           <h2>SEO 키워드·제목 추천</h2>
         </div>
-        <span className={`grok-status ${data.fromGrok ? "is-live" : ""}`}>
-          {data.status}
-        </span>
       </div>
       <div className="grok-query">
         <span>입력 키워드</span>
         <strong>{query}</strong>
       </div>
       <p className="grok-summary">{loading ? "SEO 키워드와 제목 추천을 불러오는 중입니다." : data.summary}</p>
-      <div className="keyword-cloud">
-        {data.keywords.map((keyword) => (
-          <button type="button" key={keyword} onClick={() => onKeywordClick(keyword)}>
-            {keyword}
-          </button>
-        ))}
-      </div>
       <div className="grok-section">
-        <h3>추천 제목</h3>
+        <h3>SEO 최적화 제목 샘플 3개</h3>
         <ul>
-          {data.angles.map((angle) => (
+          {data.angles.slice(0, 3).map((angle) => (
             <li key={angle}>{angle}</li>
           ))}
         </ul>
       </div>
-      <div className="grok-section avoid">
-        <h3>피해야 할 SEO 방향</h3>
+      <div className="grok-section keyword-section">
+        <h3>키워드 검색 추천 5–6개</h3>
+        <div className="keyword-cloud">
+          {data.keywords.slice(0, 6).map((keyword) => (
+            <button type="button" key={keyword} onClick={() => onKeywordClick(keyword)}>
+              {keyword}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="grok-section tip">
+        <h3>TIP. SEO 최적화 가이드</h3>
         <ul>
-          {data.avoid.map((item) => (
+          {seoGuideTips.map((tip) => (
+            <li key={tip}>{tip}</li>
+          ))}
+        </ul>
+      </div>
+      <div className="grok-section avoid">
+        <h3>TIP. 피해야 할 사항</h3>
+        <ul>
+          {data.avoid.slice(0, 3).map((item) => (
             <li key={item}>{item}</li>
           ))}
         </ul>
@@ -847,11 +864,6 @@ function KeywordInsightPanel({
         insights={data}
         selectedReference={selectedReference}
       />
-      <p className="grok-note">
-        {data.fromGrok
-          ? "Grok이 검색어와 선택 레퍼런스를 함께 보고 제작 방향을 제안합니다. 실제 이미지·영상 생성 API는 다음 단계에서 연결합니다."
-          : "현재는 선택 레퍼런스 기반 제작 플로우 UX와 로컬 제안으로 동작합니다. 이미지·영상 생성 API 연결 시 실제 파일 생성으로 전환됩니다."}
-      </p>
     </aside>
   );
 }

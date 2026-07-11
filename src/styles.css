@@ -431,7 +431,7 @@ button { color: inherit; }
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 20px;
+  margin: 0;
 }
 .keyword-cloud button {
   min-height: 32px;
@@ -469,6 +469,12 @@ button { color: inherit; }
   line-height: 1.55;
 }
 .grok-section.avoid ul { color: #9da0aa; }
+.grok-section.tip ul {
+  color: #c8c0ec;
+}
+.grok-section.keyword-section {
+  padding-bottom: 2px;
+}
 .creative-actions {
   margin-top: 18px;
   padding-top: 17px;
