@@ -394,11 +394,8 @@ class _HomeView extends StatelessWidget {
                     _ChipButton(
                       label: keyword,
                       onTap: () {
-                        final query = keyword
-                            .replaceAll('#', '')
-                            .replaceAll('_', ' ');
-                        controller.text = query;
-                        onSubmit(query);
+                        controller.text = keyword;
+                        onSubmit(keyword);
                       },
                     ),
                 ],

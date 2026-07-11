@@ -971,10 +971,10 @@ export function App() {
   }
 
   const suggestionKeywords = [
-    "#사이버펑크_네온",
-    "#여름_해변_휴가",
-    "#고급스러운_미니멀리즘",
-    "#박진감_넘치는_스포츠",
+    "신제품 런칭 광고를 만들고 싶어요",
+    "고객 후기를 활용한 제품 광고가 필요해요",
+    "시즌 프로모션용 숏폼 광고를 찾고 있어요",
+    "제품 사용 장면이 잘 보이는 광고를 만들고 싶어요",
   ];
 
   return (
@@ -1098,7 +1098,7 @@ export function App() {
                   <button
                     type="button"
                     key={keyword}
-                    onClick={() => setQuery(keyword.replace("#", "").replaceAll("_", " "))}
+                    onClick={() => setQuery(keyword)}
                   >
                     {keyword}
                   </button>
