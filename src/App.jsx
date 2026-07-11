@@ -970,12 +970,23 @@ export function App() {
     );
   }
 
-  const suggestionKeywords = [
-    "신제품 런칭 광고를 만들고 싶어요",
-    "고객 후기를 활용한 제품 광고가 필요해요",
-    "시즌 프로모션용 숏폼 광고를 찾고 있어요",
-    "제품 사용 장면이 잘 보이는 광고를 만들고 싶어요",
-  ];
+  const suggestionKeywords = useMemo(() => {
+    const pool = [
+      "신제품 런칭 광고를 만들고 싶어요",
+      "고객 후기를 활용한 제품 광고가 필요해요",
+      "시즌 프로모션용 숏폼 광고를 찾고 있어요",
+      "제품 사용 장면이 잘 보이는 광고를 만들고 싶어요",
+      "브랜드 인지도를 높이는 감성 광고를 찾고 있어요",
+      "오프라인 매장 방문을 유도하는 광고가 필요해요",
+      "프리미엄한 제품 이미지를 보여주는 광고를 만들고 싶어요",
+      "짧은 시간 안에 장점이 바로 보이는 광고가 필요해요",
+      "SNS에서 공유되기 좋은 숏폼 광고를 찾고 있어요",
+      "구매 전환을 높이는 제품 비교 광고를 만들고 싶어요",
+      "시즌 한정 이벤트를 알리는 광고가 필요해요",
+      "처음 보는 고객도 이해하기 쉬운 설명형 광고를 찾고 있어요",
+    ];
+    return [...pool].sort(() => Math.random() - 0.5).slice(0, 4);
+  }, []);
 
   return (
     <div className={`app-shell ${!hasSearched ? "home-mode" : "results-mode"}`}>
@@ -1141,11 +1152,12 @@ export function App() {
                           selectedId === reference.id ? "selected" : ""
                         }`}
                         key={reference.id}
-                        onClick={() => setSelectedId(reference.id)}
                       >
                         <button
                           className="thumbnail-button"
                           aria-label={`${reference.title} 상세 보기`}
+                          type="button"
+                          onClick={() => setSelectedId(reference.id)}
                         >
                           <img src={reference.image} alt="" />
                           <span className="duration">{reference.duration}</span>
@@ -1154,8 +1166,19 @@ export function App() {
                           </span>
                         </button>
                         <div className="card-title-row">
-                          <h2>{reference.title}</h2>
-                          <span className="source-badge">{reference.source}</span>
+                          <h2>
+                            <a href={reference.originUrl} target="_blank" rel="noreferrer">
+                              {reference.title}
+                            </a>
+                          </h2>
+                          <a
+                            className="source-badge"
+                            href={reference.originUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {reference.channel || reference.source}
+                          </a>
                           <span className="card-time">{reference.duration}</span>
                         </div>
                         <button

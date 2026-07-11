@@ -1,4 +1,7 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'core/constants.dart';
 import 'core/youchi_theme.dart';
@@ -47,6 +50,7 @@ class _YouchiShellState extends State<YouchiShell> {
   List<ReferenceVideo> _saved = [];
   List<String> _intent = [];
   List<String> _queryTerms = [];
+  List<String> _suggestions = [];
   KeywordInsight? _insight;
   ReferenceVideo? _selected;
 
@@ -56,6 +60,7 @@ class _YouchiShellState extends State<YouchiShell> {
   @override
   void initState() {
     super.initState();
+    _suggestions = _randomSuggestions();
     _loadSaved();
   }
 
@@ -73,6 +78,12 @@ class _YouchiShellState extends State<YouchiShell> {
 
   Future<void> _persistSaved() async {
     await _savedStore.save(_saved);
+  }
+
+  List<String> _randomSuggestions() {
+    final items = [...AppConstants.suggestionKeywords];
+    items.shuffle(Random());
+    return items.take(4).toList();
   }
 
   Future<void> _submitSearch([String? overrideQuery]) async {
@@ -192,6 +203,7 @@ class _YouchiShellState extends State<YouchiShell> {
                       ? _HomeView(
                           controller: _queryController,
                           loading: _loading,
+                          suggestions: _suggestions,
                           onSubmit: _submitSearch,
                         )
                       : _ResultsView(
@@ -333,11 +345,13 @@ class _HomeView extends StatelessWidget {
   const _HomeView({
     required this.controller,
     required this.loading,
+    required this.suggestions,
     required this.onSubmit,
   });
 
   final TextEditingController controller;
   final bool loading;
+  final List<String> suggestions;
   final Future<void> Function([String? query]) onSubmit;
 
   @override
@@ -390,7 +404,7 @@ class _HomeView extends StatelessWidget {
                     '추천 소재:',
                     style: TextStyle(color: YouchiColors.faint),
                   ),
-                  for (final keyword in AppConstants.suggestionKeywords)
+                  for (final keyword in suggestions)
                     _ChipButton(
                       label: keyword,
                       onTap: () {
@@ -904,21 +918,29 @@ class _ReferenceCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onSaved;
 
+  Future<void> _openOrigin() async {
+    final rawUrl = video.originUrl;
+    if (rawUrl == null || rawUrl.isEmpty) return;
+    final uri = Uri.tryParse(rawUrl);
+    if (uri == null) return;
+    await launchUrl(uri, webOnlyWindowName: '_blank');
+  }
+
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(18),
-      child: Container(
-        padding: EdgeInsets.all(boardCard ? 10 : 0),
-        decoration: boardCard
-            ? glassDecoration(radius: 18, color: const Color(0x33000000))
-            : null,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              flex: 6,
+    return Container(
+      padding: EdgeInsets.all(boardCard ? 10 : 0),
+      decoration: boardCard
+          ? glassDecoration(radius: 18, color: const Color(0x33000000))
+          : null,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 6,
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(boardCard ? 14 : 12),
               child: Stack(
                 children: [
                   Positioned.fill(
@@ -975,11 +997,14 @@ class _ReferenceCard extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 12),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
+          ),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: InkWell(
+                  onTap: _openOrigin,
                   child: Text(
                     video.title,
                     maxLines: 2,
@@ -989,50 +1014,54 @@ class _ReferenceCard extends StatelessWidget {
                       fontSize: 15,
                       fontWeight: FontWeight.w800,
                       height: 1.35,
+                      decoration: TextDecoration.none,
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                _SourceBadge(video.source),
-              ],
-            ),
-            const SizedBox(height: 10),
-            OutlinedButton.icon(
-              onPressed: onSaved,
-              icon: Icon(
-                saved ? Icons.bookmark : Icons.bookmark_border,
-                size: 16,
               ),
-              label: Text(saved ? '저장됨' : '보드 저장'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: saved
-                    ? YouchiColors.accentBright
-                    : YouchiColors.muted,
-                side: BorderSide(
-                  color: saved ? YouchiColors.accent : YouchiColors.line,
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              video.reason,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: YouchiColors.faint, fontSize: 12),
-            ),
-            if (video.matchedTerms.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: [
-                  for (final term in video.matchedTerms.take(4))
-                    _MiniPill(term),
-                ],
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: _openOrigin,
+                borderRadius: BorderRadius.circular(8),
+                child: _SourceBadge(video.channel ?? video.source),
               ),
             ],
+          ),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: onSaved,
+            icon: Icon(
+              saved ? Icons.bookmark : Icons.bookmark_border,
+              size: 16,
+            ),
+            label: Text(saved ? '저장됨' : '보드 저장'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: saved
+                  ? YouchiColors.accentBright
+                  : YouchiColors.muted,
+              side: BorderSide(
+                color: saved ? YouchiColors.accent : YouchiColors.line,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            video.reason,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: YouchiColors.faint, fontSize: 12),
+          ),
+          if (video.matchedTerms.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final term in video.matchedTerms.take(4)) _MiniPill(term),
+              ],
+            ),
           ],
-        ),
+        ],
       ),
     );
   }

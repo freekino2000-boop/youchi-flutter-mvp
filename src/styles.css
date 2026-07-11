@@ -1581,14 +1581,34 @@ button { color: inherit; }
   -webkit-box-orient: vertical;
 }
 
+.card-title-row h2 a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.card-title-row h2 a:hover {
+  color: #fff;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .source-badge {
   height: 30px;
+  max-width: 136px;
   border-color: rgba(139,92,246,.85);
   border-radius: 8px;
   padding: 0 11px;
   color: var(--accent-bright);
   font-size: 12px;
   font-weight: 600;
+  overflow: hidden;
+  text-decoration: none;
+  text-overflow: ellipsis;
+}
+
+.source-badge:hover {
+  border-color: rgba(208,188,255,.95);
+  color: #fff;
 }
 
 .card-time {
