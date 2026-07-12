@@ -3,10 +3,15 @@ import {
   ArrowRight,
   BookmarkSimple,
   Check,
+  Compass,
   Clock,
   Export,
+  House,
+  Lightning,
   MagnifyingGlass,
   Sparkle,
+  Stack,
+  User,
   X,
 } from "@phosphor-icons/react";
 import Hls from "hls.js";
@@ -1358,6 +1363,34 @@ export function App() {
         <Clock size={18} />
         YOUCHI DB에서 의미가 가까운 레퍼런스를 찾는 중…
       </div>
+      {hasSearched && !savedOnly && (
+        <button
+          className="mobile-production-fab"
+          type="button"
+          onClick={() => setSelectedId(rankedResults[0]?.id ?? selectedId)}
+        >
+          <Lightning size={15} weight="fill" />
+          빠른 생성
+        </button>
+      )}
+      <nav className="mobile-bottom-nav" aria-label="모바일 하단 내비게이션">
+        <button type="button" className={!savedOnly ? "active" : ""} onClick={goHome}>
+          <House size={18} weight={!savedOnly ? "fill" : "regular"} />
+          <span>홈</span>
+        </button>
+        <button type="button" onClick={() => setHasSearched(true)}>
+          <Compass size={18} />
+          <span>탐색</span>
+        </button>
+        <button type="button" className={savedOnly ? "active" : ""} onClick={toggleSavedOnly}>
+          <Stack size={18} weight={savedOnly ? "fill" : "regular"} />
+          <span>보드</span>
+        </button>
+        <button type="button">
+          <User size={18} />
+          <span>내 정보</span>
+        </button>
+      </nav>
     </div>
   );
 }
