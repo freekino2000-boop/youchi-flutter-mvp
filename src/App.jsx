@@ -504,12 +504,15 @@ function ProductionFlow({ query, insights, selectedReference }) {
   const [storyboardVersion, setStoryboardVersion] = useState(1);
   const [finalOutput, setFinalOutput] = useState(null);
   const [imageGenerating, setImageGenerating] = useState(false);
+  const [videoGenerating, setVideoGenerating] = useState(false);
+  const [rendering, setRendering] = useState(false);
   const [productionError, setProductionError] = useState("");
 
   const hasImages = cuts.length === 6;
   const allImagesApproved =
     hasImages && cuts.every((cut) => cut.imageUrl && cut.imageApproved);
-  const hasVideos = hasImages && cuts.every((cut) => cut.videoVersion > 0);
+  const videoStarted = hasImages && cuts.some((cut) => cut.videoStatus);
+  const hasVideos = hasImages && cuts.every((cut) => cut.videoUrl);
   const allVideosApproved = hasVideos && cuts.every((cut) => cut.videoApproved);
 
   useEffect(() => {
@@ -518,6 +521,8 @@ function ProductionFlow({ query, insights, selectedReference }) {
     setStoryboardVersion(1);
     setProductionError("");
     setImageGenerating(false);
+    setVideoGenerating(false);
+    setRendering(false);
   }, [selectedReference?.id]);
 
   async function createStoryboard() {
@@ -600,6 +605,8 @@ function ProductionFlow({ query, insights, selectedReference }) {
       imageApproved: false,
       videoVersion: 0,
       videoApproved: false,
+      videoUrl: null,
+      videoStatus: undefined,
       imageStatus: "generating",
       imagePrompt: `${target.imagePrompt}\n재생성 요청: 같은 콘셉트 유지, 구도와 제품 표현만 개선 · v${target.imageVersion + 1}`,
     };
@@ -636,31 +643,114 @@ function ProductionFlow({ query, insights, selectedReference }) {
     }
   }
 
-  function createVideos() {
+  async function createVideos() {
+    if (!allImagesApproved || videoGenerating) return;
+
     setCuts((current) =>
       current.map((cut) => ({
         ...cut,
-        videoVersion: cut.videoVersion || 1,
+        videoStatus: "generating",
         videoApproved: false,
       })),
     );
     setFinalOutput(null);
+    setProductionError("");
+    setVideoGenerating(true);
+
+    try {
+      const response = await fetch(`${API_BASE}/api/creative/videos`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          query,
+          ratio,
+          reference: selectedReference,
+          cuts,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.message || "영상 생성 실패");
+
+      const videosByCut = new Map(
+        (payload.videos || []).map((video) => [video.cutId, video]),
+      );
+      setCuts((current) =>
+        current.map((cut) => {
+          const video = videosByCut.get(cut.id);
+          return video
+            ? {
+                ...cut,
+                videoUrl: video.videoUrl,
+                videoStatus: "generated",
+                videoVersion: (cut.videoVersion || 0) + 1,
+                videoDurationSeconds: video.durationSeconds,
+              }
+            : { ...cut, videoStatus: "failed" };
+        }),
+      );
+    } catch (error) {
+      setProductionError(error.message);
+      setCuts((current) => current.map((cut) => ({ ...cut, videoStatus: "failed" })));
+    } finally {
+      setVideoGenerating(false);
+    }
   }
 
-  function regenerateVideo(cutId) {
-    updateCut(cutId, (cut) => ({
-      ...cut,
-      videoVersion: cut.videoVersion + 1,
-      videoApproved: false,
-    }));
+  async function regenerateVideo(cutId) {
+    const target = cuts.find((cut) => cut.id === cutId);
+    if (!target || !target.imageUrl || target.videoStatus === "generating") return;
+
+    updateCut(cutId, (cut) => ({ ...cut, videoStatus: "generating", videoApproved: false }));
+    setProductionError("");
+
+    try {
+      const response = await fetch(`${API_BASE}/api/creative/video`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          query,
+          ratio,
+          reference: selectedReference,
+          cut: target,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.message || "영상 재생성 실패");
+
+      updateCut(cutId, (cut) => ({
+        ...cut,
+        videoUrl: payload.video.videoUrl,
+        videoStatus: "generated",
+        videoVersion: (cut.videoVersion || 0) + 1,
+        videoDurationSeconds: payload.video.durationSeconds,
+      }));
+    } catch (error) {
+      setProductionError(error.message);
+      updateCut(cutId, (cut) => ({ ...cut, videoStatus: "failed" }));
+    }
   }
 
-  function renderFinal() {
-    setFinalOutput({
-      name: `YOUCHI_${query.replace(/\s+/g, "_")}_${ratio.replace(":", "x")}_reference_based_6cuts.mp4`,
-      duration: "15초",
-      status: "MP4 렌더링 준비 완료",
-    });
+  async function renderFinal() {
+    if (!allVideosApproved || rendering) return;
+
+    setRendering(true);
+    setProductionError("");
+
+    try {
+      const response = await fetch(`${API_BASE}/api/creative/render`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ query, ratio, cuts }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.message || "최종 렌더링 실패");
+
+      setFinalOutput(payload.finalOutput);
+    } catch (error) {
+      setProductionError(error.message);
+    } finally {
+      setRendering(false);
+    }
   }
 
   return (
@@ -780,29 +870,49 @@ function ProductionFlow({ query, insights, selectedReference }) {
         <button
           className="primary-flow-button"
           type="button"
-          disabled={!allImagesApproved}
+          disabled={!allImagesApproved || videoGenerating}
           onClick={createVideos}
         >
-          영상화 하기
+          {videoGenerating ? "Veo 영상 생성 중…" : "영상화 하기"}
         </button>
       </div>
 
-      {hasVideos && (
+      {videoStarted && (
         <div className="motion-list">
           {cuts.map((cut) => (
             <article className="motion-card" key={`${cut.id}-motion`}>
+              <div className={`cut-preview ratio-${cut.ratio.replace(":", "-")}`}>
+                {cut.videoUrl ? (
+                  <video src={cut.videoUrl} poster={cut.imageUrl} controls playsInline loop muted />
+                ) : cut.imageUrl ? (
+                  <img src={cut.imageUrl} alt={`${cut.role} 이미지`} />
+                ) : null}
+              </div>
               <div>
                 <span>CUT {cut.number}</span>
                 <strong>{cut.motion}</strong>
-                <p>video v{cut.videoVersion}</p>
+                <p>
+                  {cut.videoStatus === "generating"
+                    ? "Veo 영상 생성 중…"
+                    : cut.videoStatus === "failed"
+                      ? "영상 생성 실패"
+                      : cut.videoUrl
+                        ? `video v${cut.videoVersion || 1}`
+                        : "영상화 대기"}
+                </p>
               </div>
               <div className="cut-actions">
-                <button type="button" onClick={() => regenerateVideo(cut.id)}>
-                  영상 재생성
+                <button
+                  type="button"
+                  disabled={!cut.imageUrl || cut.videoStatus === "generating"}
+                  onClick={() => regenerateVideo(cut.id)}
+                >
+                  {cut.videoStatus === "generating" ? "생성 중…" : "영상 재생성"}
                 </button>
                 <button
                   type="button"
                   className={cut.videoApproved ? "approved" : ""}
+                  disabled={!cut.videoUrl}
                   onClick={() =>
                     updateCut(cut.id, (current) => ({
                       ...current,
@@ -826,10 +936,10 @@ function ProductionFlow({ query, insights, selectedReference }) {
         <button
           className="primary-flow-button"
           type="button"
-          disabled={!allVideosApproved}
+          disabled={!allVideosApproved || rendering}
           onClick={renderFinal}
         >
-          최종 결과물 생성
+          {rendering ? "MP4 합치는 중…" : "최종 결과물 생성"}
         </button>
       </div>
 
@@ -837,7 +947,17 @@ function ProductionFlow({ query, insights, selectedReference }) {
         <div className="final-output">
           <strong>{finalOutput.status}</strong>
           <p>{finalOutput.name}</p>
-          <span>{ratio} · {finalOutput.duration} · 6컷 연결</span>
+          <span>
+            {ratio} · {finalOutput.duration} · {finalOutput.cutCount || cuts.length}컷 연결
+          </span>
+          {finalOutput.videoUrl && (
+            <video
+              src={finalOutput.videoUrl}
+              controls
+              playsInline
+              style={{ width: "100%", marginTop: 12, borderRadius: 12 }}
+            />
+          )}
         </div>
       )}
     </div>

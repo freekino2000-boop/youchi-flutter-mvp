@@ -1,7 +1,11 @@
 import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { references as curatedReferences } from "./src/data.js";
+
+const execFileAsync = promisify(execFile);
 
 function loadLocalEnv() {
   const envPath = path.resolve(".env");
@@ -32,6 +36,9 @@ const OPENAI_IMAGE_MODEL = process.env.OPENAI_IMAGE_MODEL || "gpt-image-1";
 const IMAGE_PROVIDER = (process.env.IMAGE_PROVIDER || "openai").toLowerCase();
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
 const GOOGLE_IMAGE_MODEL = process.env.GOOGLE_IMAGE_MODEL || "gemini-3.1-flash-image";
+const GOOGLE_VIDEO_MODEL = process.env.GOOGLE_VIDEO_MODEL || "veo-3.1-fast-generate-preview";
+const GOOGLE_VIDEO_RESOLUTION = process.env.GOOGLE_VIDEO_RESOLUTION || "720p";
+const GOOGLE_VIDEO_DURATION_SECONDS = process.env.GOOGLE_VIDEO_DURATION_SECONDS || "4";
 const GENERATED_DIR = path.resolve("public/generated");
 
 const genericSearchTerms = [
@@ -779,6 +786,241 @@ async function generateGoogleImage({ query, ratio, reference, cut }) {
   };
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function buildVideoGenerationPrompt({ query, ratio, reference, cut }) {
+  return [
+    "Animate this advertising key visual into a short cinematic ad clip.",
+    "Keep the same subject, product, framing, and composition as the source image.",
+    "Do not add logos, readable brand names, watermarks, UI, subtitles, or text overlays.",
+    `Camera motion: ${cut?.motion || "subtle, natural motion"}.`,
+    `Storyboard cut role: ${cut?.role || ""}.`,
+    cut?.scene ? `Scene: ${cut.scene}.` : "",
+    `Output aspect ratio: ${ratio}.`,
+    `Product/search topic: ${query}.`,
+    reference?.title ? `Reference video mood/title: ${reference.title}.` : "",
+    "Style: premium Korean advertising footage, natural light, realistic motion, no camera shake, no text overlays.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function extractGeminiVideoUri(payload) {
+  const direct = payload?.generateVideoResponse?.generatedSamples?.[0]?.video?.uri;
+  if (direct) return direct;
+
+  const queue = [payload];
+  while (queue.length) {
+    const current = queue.shift();
+    if (!current || typeof current !== "object") continue;
+    if (typeof current.uri === "string" && /^https?:\/\//.test(current.uri)) return current.uri;
+
+    for (const value of Object.values(current)) {
+      if (value && typeof value === "object") queue.push(value);
+    }
+  }
+
+  return null;
+}
+
+async function pollGeminiOperation(operationName) {
+  const startedAt = Date.now();
+  const maxWaitMs = 6 * 60 * 1000;
+
+  while (Date.now() - startedAt < maxWaitMs) {
+    await sleep(6000);
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/${operationName}`, {
+      headers: { "x-goog-api-key": GEMINI_API_KEY },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      const error = new Error(`Google video poll ${response.status}: ${errorText.slice(0, 240)}`);
+      error.code = "google_video_failed";
+      throw error;
+    }
+
+    const payload = await response.json();
+    if (payload.done) {
+      if (payload.error) {
+        const error = new Error(
+          `Google video operation error: ${payload.error.message || JSON.stringify(payload.error).slice(0, 240)}`,
+        );
+        error.code = "google_video_failed";
+        throw error;
+      }
+      return payload.response;
+    }
+  }
+
+  const timeoutError = new Error("Google video generation timed out.");
+  timeoutError.code = "google_video_timeout";
+  throw timeoutError;
+}
+
+async function downloadGeminiVideo(uri) {
+  const response = await fetch(uri, { headers: { "x-goog-api-key": GEMINI_API_KEY } });
+  if (!response.ok) {
+    const errorText = await response.text();
+    const error = new Error(`Google video download ${response.status}: ${errorText.slice(0, 240)}`);
+    error.code = "google_video_failed";
+    throw error;
+  }
+  return Buffer.from(await response.arrayBuffer());
+}
+
+async function generateGoogleVideo({ query, ratio, reference, cut }) {
+  if (!GEMINI_API_KEY) {
+    const error = new Error("GEMINI_API_KEY가 필요합니다.");
+    error.code = "google_key_missing";
+    throw error;
+  }
+  if (!cut?.imageUrl) {
+    const error = new Error("영상화할 이미지가 없습니다. 이미지를 먼저 생성하고 확정해주세요.");
+    error.code = "google_video_image_missing";
+    throw error;
+  }
+
+  const imagePath = path.join(GENERATED_DIR, path.basename(cut.imageUrl));
+  if (!fs.existsSync(imagePath)) {
+    const error = new Error("소스 이미지 파일을 찾을 수 없습니다.");
+    error.code = "google_video_image_missing";
+    throw error;
+  }
+
+  const imageBuffer = fs.readFileSync(imagePath);
+  const imageMimeType = imagePath.toLowerCase().endsWith(".png") ? "image/png" : "image/jpeg";
+  const prompt = buildVideoGenerationPrompt({ query, ratio, reference, cut });
+
+  const startResponse = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GOOGLE_VIDEO_MODEL}:predictLongRunning`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-goog-api-key": GEMINI_API_KEY,
+      },
+      body: JSON.stringify({
+        instances: [
+          {
+            prompt,
+            image: {
+              inlineData: {
+                mimeType: imageMimeType,
+                data: imageBuffer.toString("base64"),
+              },
+            },
+          },
+        ],
+        parameters: {
+          aspectRatio: googleAspectRatio(ratio),
+          resolution: GOOGLE_VIDEO_RESOLUTION,
+          durationSeconds: GOOGLE_VIDEO_DURATION_SECONDS,
+        },
+      }),
+    },
+  );
+
+  if (!startResponse.ok) {
+    const errorText = await startResponse.text();
+    const error = new Error(`Google video ${startResponse.status}: ${errorText.slice(0, 240)}`);
+    error.code = "google_video_failed";
+    throw error;
+  }
+
+  const startPayload = await startResponse.json();
+  const operationName = startPayload.name;
+  if (!operationName) {
+    const error = new Error("Google video response did not include an operation name.");
+    error.code = "google_video_failed";
+    throw error;
+  }
+
+  const resultPayload = await pollGeminiOperation(operationName);
+  const videoUri = extractGeminiVideoUri(resultPayload);
+  if (!videoUri) {
+    const error = new Error("Google video response did not include a video URI.");
+    error.code = "google_video_empty";
+    throw error;
+  }
+
+  const videoBuffer = await downloadGeminiVideo(videoUri);
+  fs.mkdirSync(GENERATED_DIR, { recursive: true });
+  const fileName = `${Date.now()}-${safeFilePart(query)}-${safeFilePart(cut?.id || cut?.role)}-${Math.random().toString(36).slice(2, 8)}.mp4`;
+  const filePath = path.join(GENERATED_DIR, fileName);
+  fs.writeFileSync(filePath, videoBuffer);
+
+  return {
+    cutId: cut?.id,
+    videoUrl: `/generated/${fileName}`,
+    durationSeconds: Number(GOOGLE_VIDEO_DURATION_SECONDS),
+    prompt,
+  };
+}
+
+async function renderFinalVideo({ query, ratio, cuts }) {
+  const orderedCuts = (cuts || []).filter((cut) => cut?.videoUrl);
+  if (orderedCuts.length < 2) {
+    const error = new Error("합칠 영상이 2개 이상 필요합니다. 컷별 영상화를 먼저 완료해주세요.");
+    error.code = "video_render_insufficient";
+    throw error;
+  }
+
+  const inputPaths = orderedCuts.map((cut) => path.join(GENERATED_DIR, path.basename(cut.videoUrl)));
+  for (const inputPath of inputPaths) {
+    if (!fs.existsSync(inputPath)) {
+      const error = new Error(`영상 파일을 찾을 수 없습니다: ${path.basename(inputPath)}`);
+      error.code = "video_render_missing_file";
+      throw error;
+    }
+  }
+
+  fs.mkdirSync(GENERATED_DIR, { recursive: true });
+  const fileName = `${Date.now()}-${safeFilePart(query)}-final-${Math.random().toString(36).slice(2, 8)}.mp4`;
+  const outputPath = path.join(GENERATED_DIR, fileName);
+
+  const filterInputs = inputPaths.map((_, videoIndex) => `[${videoIndex}:v:0][${videoIndex}:a:0]`).join("");
+  const filterComplex = `${filterInputs}concat=n=${inputPaths.length}:v=1:a=1[outv][outa]`;
+  const args = [
+    "-y",
+    ...inputPaths.flatMap((inputPath) => ["-i", inputPath]),
+    "-filter_complex",
+    filterComplex,
+    "-map",
+    "[outv]",
+    "-map",
+    "[outa]",
+    outputPath,
+  ];
+
+  try {
+    await execFileAsync("ffmpeg", args, { maxBuffer: 1024 * 1024 * 20 });
+  } catch (error) {
+    const wrapped = new Error(`ffmpeg 합치기 실패: ${String(error.message || error).slice(0, 300)}`);
+    wrapped.code = "video_render_failed";
+    throw wrapped;
+  }
+
+  const durationSeconds = orderedCuts.reduce(
+    (sum, cut) => sum + Number(cut.videoDurationSeconds || GOOGLE_VIDEO_DURATION_SECONDS),
+    0,
+  );
+
+  return {
+    name: fileName,
+    videoUrl: `/generated/${fileName}`,
+    duration: `${durationSeconds}초`,
+    cutCount: orderedCuts.length,
+    status: "MP4 렌더링 완료",
+  };
+}
+
+function videoProviderConfigured() {
+  return Boolean(GEMINI_API_KEY);
+}
+
 function isGoogleImageProvider() {
   return IMAGE_PROVIDER === "google" || IMAGE_PROVIDER === "gemini";
 }
@@ -800,8 +1042,9 @@ async function generateProviderImage(args) {
   return generateOpenAIImage(args);
 }
 
-function sendGenerationError(response, error) {
-  console.warn(`[YOUCHI API] Image generation failed: ${error.message}`);
+function sendGenerationError(response, error, kind = "image") {
+  const label = kind === "video" ? "Veo 영상" : "이미지";
+  console.warn(`[YOUCHI API] ${kind} generation failed: ${error.message}`);
   if (error.code === "google_key_missing") {
     sendJson(response, 400, {
       error: "google_key_missing",
@@ -816,6 +1059,28 @@ function sendGenerationError(response, error) {
     });
     return;
   }
+  if (error.code === "google_video_image_missing") {
+    sendJson(response, 400, {
+      error: "google_video_image_missing",
+      message: error.message,
+    });
+    return;
+  }
+  if (error.code === "google_video_timeout") {
+    sendJson(response, 504, {
+      error: "google_video_timeout",
+      message: "Veo 영상 생성이 시간 내에 완료되지 않았습니다. 잠시 후 다시 시도해주세요.",
+    });
+    return;
+  }
+  if (error.code === "video_render_insufficient" || error.code === "video_render_missing_file") {
+    sendJson(response, 400, { error: error.code, message: error.message });
+    return;
+  }
+  if (error.code === "video_render_failed") {
+    sendJson(response, 502, { error: error.code, message: error.message });
+    return;
+  }
   if (/billing_hard_limit_reached|Billing hard limit/i.test(error.message)) {
     sendJson(response, 402, {
       error: "openai_billing_limit",
@@ -826,14 +1091,14 @@ function sendGenerationError(response, error) {
   if (/PERMISSION_DENIED|permission|API key not valid|INVALID_ARGUMENT|not found|model/i.test(error.message)) {
     sendJson(response, 403, {
       error: "google_permission_required",
-      message: "Gemini 이미지 모델 권한 또는 API 키 설정을 확인해주세요. Google AI Studio에서 키, 모델 권한, 사용 가능 지역을 다시 확인하면 됩니다.",
+      message: `Gemini ${label} 모델 권한 또는 API 키 설정을 확인해주세요. Google AI Studio에서 키, 모델 권한, 사용 가능 지역을 다시 확인하면 됩니다.`,
     });
     return;
   }
   if (/RESOURCE_EXHAUSTED|quota|billing|limit/i.test(error.message)) {
     sendJson(response, 402, {
       error: "google_quota_required",
-      message: "Gemini 이미지 생성 할당량 또는 결제 설정을 확인해주세요. Google AI Studio/Cloud의 사용량 한도와 결제 상태가 필요할 수 있습니다.",
+      message: `Gemini ${label} 생성 할당량 또는 결제 설정을 확인해주세요. Google AI Studio/Cloud의 사용량 한도와 결제 상태가 필요할 수 있습니다.`,
     });
     return;
   }
@@ -845,8 +1110,8 @@ function sendGenerationError(response, error) {
     return;
   }
   sendJson(response, 502, {
-    error: "image_generation_failed",
-    message: "이미지 생성 중 문제가 발생했습니다. API 키, 결제 상태, 모델 권한을 확인해주세요.",
+    error: `${kind}_generation_failed`,
+    message: `${label} 생성 중 문제가 발생했습니다. API 키, 결제 상태, 모델 권한을 확인해주세요.`,
   });
 }
 
@@ -887,6 +1152,8 @@ const server = http.createServer((request, response) => {
       imageProvider: isGoogleImageProvider() ? "google" : "openai",
       imageConfigured: imageProviderConfigured(),
       imageModel: imageProviderConfigured() ? currentImageModel() : null,
+      videoConfigured: videoProviderConfigured(),
+      videoModel: videoProviderConfigured() ? GOOGLE_VIDEO_MODEL : null,
     });
     return;
   }
@@ -985,6 +1252,69 @@ const server = http.createServer((request, response) => {
     return;
   }
 
+  if (url.pathname === "/api/creative/videos" && request.method === "POST") {
+    readJsonBody(request)
+      .then(async (body) => {
+        const cuts = Array.isArray(body.cuts) ? body.cuts.slice(0, 6) : [];
+        if (!cuts.length) {
+          sendJson(response, 400, { error: "cuts_required" });
+          return;
+        }
+
+        const videos = [];
+        for (const cut of cuts) {
+          videos.push(
+            await generateGoogleVideo({
+              query: body.query || "",
+              ratio: body.ratio || "9:16",
+              reference: body.reference || null,
+              cut,
+            }),
+          );
+        }
+
+        sendJson(response, 200, { videos });
+      })
+      .catch((error) => sendGenerationError(response, error, "video"));
+    return;
+  }
+
+  if (url.pathname === "/api/creative/video" && request.method === "POST") {
+    readJsonBody(request)
+      .then(async (body) => {
+        if (!body.cut) {
+          sendJson(response, 400, { error: "cut_required" });
+          return;
+        }
+
+        const video = await generateGoogleVideo({
+          query: body.query || "",
+          ratio: body.ratio || "9:16",
+          reference: body.reference || null,
+          cut: body.cut,
+        });
+
+        sendJson(response, 200, { video });
+      })
+      .catch((error) => sendGenerationError(response, error, "video"));
+    return;
+  }
+
+  if (url.pathname === "/api/creative/render" && request.method === "POST") {
+    readJsonBody(request)
+      .then(async (body) => {
+        const finalOutput = await renderFinalVideo({
+          query: body.query || "",
+          ratio: body.ratio || "9:16",
+          cuts: Array.isArray(body.cuts) ? body.cuts : [],
+        });
+
+        sendJson(response, 200, { finalOutput });
+      })
+      .catch((error) => sendGenerationError(response, error, "video"));
+    return;
+  }
+
   sendJson(response, 404, { error: "not_found" });
 });
 
@@ -1014,5 +1344,10 @@ server.listen(PORT, "127.0.0.1", () => {
     imageProviderConfigured()
       ? `[YOUCHI API] Image generation connected with ${imageProviderLabel()} / ${currentImageModel()}`
       : `[YOUCHI API] ${imageProviderLabel()} image key not found. Add ${isGoogleImageProvider() ? "GEMINI_API_KEY" : "OPENAI_API_KEY"} to .env for real image generation.`,
+  );
+  console.log(
+    videoProviderConfigured()
+      ? `[YOUCHI API] Video generation connected with Google Veo / ${GOOGLE_VIDEO_MODEL}`
+      : "[YOUCHI API] GEMINI_API_KEY not found. Add it to .env for real Veo video generation.",
   );
 });

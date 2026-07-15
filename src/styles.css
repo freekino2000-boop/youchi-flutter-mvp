@@ -685,7 +685,8 @@ button { color: inherit; }
     linear-gradient(135deg, rgba(34,44,30,.95), rgba(13,16,24,.95));
   text-align: center;
 }
-.cut-preview img {
+.cut-preview img,
+.cut-preview video {
   position: absolute;
   inset: 0;
   width: 100%;

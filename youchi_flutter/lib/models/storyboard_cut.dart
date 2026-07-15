@@ -1,3 +1,5 @@
+enum VideoStatus { idle, generating, generated, failed }
+
 class StoryboardCut {
   StoryboardCut({
     required this.id,
@@ -13,6 +15,9 @@ class StoryboardCut {
     this.imageApproved = false,
     this.videoApproved = false,
     this.videoVersion = 0,
+    this.videoUrl,
+    this.videoDurationSeconds,
+    this.videoStatus = VideoStatus.idle,
     this.isGenerating = false,
   });
 
@@ -29,6 +34,9 @@ class StoryboardCut {
   final bool imageApproved;
   final bool videoApproved;
   final int videoVersion;
+  final String? videoUrl;
+  final int? videoDurationSeconds;
+  final VideoStatus videoStatus;
   final bool isGenerating;
 
   StoryboardCut copyWith({
@@ -37,7 +45,11 @@ class StoryboardCut {
     bool? imageApproved,
     bool? videoApproved,
     int? videoVersion,
+    String? videoUrl,
+    int? videoDurationSeconds,
+    VideoStatus? videoStatus,
     bool? isGenerating,
+    bool clearVideo = false,
   }) {
     return StoryboardCut(
       id: id,
@@ -51,8 +63,13 @@ class StoryboardCut {
       imageUrl: imageUrl ?? this.imageUrl,
       revisedPrompt: revisedPrompt ?? this.revisedPrompt,
       imageApproved: imageApproved ?? this.imageApproved,
-      videoApproved: videoApproved ?? this.videoApproved,
-      videoVersion: videoVersion ?? this.videoVersion,
+      videoApproved: clearVideo ? false : (videoApproved ?? this.videoApproved),
+      videoVersion: clearVideo ? 0 : (videoVersion ?? this.videoVersion),
+      videoUrl: clearVideo ? null : (videoUrl ?? this.videoUrl),
+      videoDurationSeconds: clearVideo
+          ? null
+          : (videoDurationSeconds ?? this.videoDurationSeconds),
+      videoStatus: clearVideo ? VideoStatus.idle : (videoStatus ?? this.videoStatus),
       isGenerating: isGenerating ?? this.isGenerating,
     );
   }
@@ -67,6 +84,9 @@ class StoryboardCut {
       'motion': motion,
       'ratio': ratio,
       'imagePrompt': imagePrompt,
+      'imageUrl': imageUrl,
+      'videoUrl': videoUrl,
+      'videoDurationSeconds': videoDurationSeconds,
     };
   }
 }

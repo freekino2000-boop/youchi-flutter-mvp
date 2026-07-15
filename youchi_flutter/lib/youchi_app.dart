@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:video_player/video_player.dart';
 
 import 'core/constants.dart';
 import 'core/youchi_theme.dart';
@@ -1499,16 +1500,19 @@ class _ProductionFlow extends StatefulWidget {
 class _ProductionFlowState extends State<_ProductionFlow> {
   String _ratio = '9:16';
   bool _generating = false;
+  bool _videoGenerating = false;
+  bool _rendering = false;
   String _error = '';
-  String? _finalOutput;
+  FinalRenderOutput? _finalOutput;
   List<StoryboardCut> _cuts = [];
 
   bool get _hasImages => _cuts.length == 6;
   bool get _allImagesApproved =>
       _hasImages &&
       _cuts.every((cut) => cut.imageUrl != null && cut.imageApproved);
-  bool get _hasVideos =>
-      _hasImages && _cuts.every((cut) => cut.videoVersion > 0);
+  bool get _videoStarted =>
+      _hasImages && _cuts.any((cut) => cut.videoStatus != VideoStatus.idle);
+  bool get _hasVideos => _hasImages && _cuts.every((cut) => cut.videoUrl != null);
   bool get _allVideosApproved =>
       _hasVideos && _cuts.every((cut) => cut.videoApproved);
 
@@ -1520,6 +1524,8 @@ class _ProductionFlowState extends State<_ProductionFlow> {
         _cuts = [];
         _error = '';
         _finalOutput = null;
+        _videoGenerating = false;
+        _rendering = false;
       });
     }
   }
@@ -1558,6 +1564,133 @@ class _ProductionFlowState extends State<_ProductionFlow> {
       });
     } finally {
       if (mounted) setState(() => _generating = false);
+    }
+  }
+
+  Future<void> _createVideos() async {
+    if (!_allImagesApproved || _videoGenerating) return;
+    setState(() {
+      _cuts = _cuts
+          .map(
+            (cut) => cut.copyWith(
+              videoStatus: VideoStatus.generating,
+              videoApproved: false,
+            ),
+          )
+          .toList();
+      _finalOutput = null;
+      _error = '';
+      _videoGenerating = true;
+    });
+
+    try {
+      final videos = await widget.api.createVideos(
+        query: widget.query,
+        ratio: _ratio,
+        reference: widget.reference!,
+        cuts: _cuts,
+      );
+      final byCut = {for (final video in videos) video.cutId: video};
+      setState(() {
+        _cuts = _cuts.map((cut) {
+          final video = byCut[cut.id];
+          if (video == null) {
+            return cut.copyWith(videoStatus: VideoStatus.failed);
+          }
+          return cut.copyWith(
+            videoUrl: video.videoUrl,
+            videoStatus: VideoStatus.generated,
+            videoVersion: cut.videoVersion + 1,
+            videoDurationSeconds: video.durationSeconds,
+          );
+        }).toList();
+      });
+    } catch (error) {
+      setState(() {
+        _error = '$error';
+        _cuts = _cuts
+            .map((cut) => cut.copyWith(videoStatus: VideoStatus.failed))
+            .toList();
+      });
+    } finally {
+      if (mounted) setState(() => _videoGenerating = false);
+    }
+  }
+
+  Future<void> _regenerateVideo(String cutId) async {
+    final target = _cuts.firstWhere((cut) => cut.id == cutId);
+    if (target.imageUrl == null || target.videoStatus == VideoStatus.generating) {
+      return;
+    }
+
+    setState(() {
+      _cuts = _cuts
+          .map(
+            (cut) => cut.id == cutId
+                ? cut.copyWith(
+                    videoStatus: VideoStatus.generating,
+                    videoApproved: false,
+                  )
+                : cut,
+          )
+          .toList();
+      _error = '';
+      _finalOutput = null;
+    });
+
+    try {
+      final video = await widget.api.createVideo(
+        query: widget.query,
+        ratio: _ratio,
+        reference: widget.reference!,
+        cut: target,
+      );
+      setState(() {
+        _cuts = _cuts
+            .map(
+              (cut) => cut.id == cutId
+                  ? cut.copyWith(
+                      videoUrl: video.videoUrl,
+                      videoStatus: VideoStatus.generated,
+                      videoVersion: cut.videoVersion + 1,
+                      videoDurationSeconds: video.durationSeconds,
+                    )
+                  : cut,
+            )
+            .toList();
+      });
+    } catch (error) {
+      setState(() {
+        _error = '$error';
+        _cuts = _cuts
+            .map(
+              (cut) => cut.id == cutId
+                  ? cut.copyWith(videoStatus: VideoStatus.failed)
+                  : cut,
+            )
+            .toList();
+      });
+    }
+  }
+
+  Future<void> _renderFinal() async {
+    if (!_allVideosApproved || _rendering) return;
+    setState(() {
+      _rendering = true;
+      _error = '';
+    });
+
+    try {
+      final finalOutput = await widget.api.renderFinal(
+        query: widget.query,
+        ratio: _ratio,
+        cuts: _cuts,
+      );
+      setState(() => _finalOutput = finalOutput);
+    } catch (error) {
+      setState(() => _error = '$error');
+    } finally {
+      if (mounted) setState(() => _rendering = false);
     }
   }
 
@@ -1669,6 +1802,7 @@ class _ProductionFlowState extends State<_ProductionFlow> {
           for (final cut in _cuts)
             _CutCard(
               cut: cut,
+              baseUrl: widget.api.baseUrl,
               onApproveImage: () {
                 setState(() {
                   _cuts = _cuts
@@ -1688,7 +1822,7 @@ class _ProductionFlowState extends State<_ProductionFlow> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                '2. 영상화 하기',
+                '2. 영상화 하기 (Google Veo)',
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w800,
@@ -1696,46 +1830,34 @@ class _ProductionFlowState extends State<_ProductionFlow> {
               ),
               const SizedBox(height: 10),
               _PrimaryButton(
-                label: '영상화 하기',
-                disabled: !_allImagesApproved,
-                onTap: () {
-                  setState(() {
-                    _cuts = _cuts
-                        .map(
-                          (cut) =>
-                              cut.copyWith(videoVersion: cut.videoVersion + 1),
-                        )
-                        .toList();
-                  });
-                },
+                label: _videoGenerating ? 'Veo 영상 생성 중…' : '영상화 하기',
+                disabled: !_allImagesApproved || _videoGenerating,
+                onTap: _createVideos,
               ),
             ],
           ),
         ),
-        if (_hasVideos)
+        if (_videoStarted)
           for (final cut in _cuts)
             Padding(
               padding: const EdgeInsets.only(top: 8),
-              child: Row(
-                children: [
-                  Expanded(child: Text('CUT ${cut.number} · ${cut.motion}')),
-                  TextButton(
-                    onPressed: () {
-                      setState(() {
-                        _cuts = _cuts
-                            .map(
-                              (item) => item.id == cut.id
-                                  ? item.copyWith(
-                                      videoApproved: !item.videoApproved,
-                                    )
-                                  : item,
-                            )
-                            .toList();
-                      });
-                    },
-                    child: Text(cut.videoApproved ? '확정됨' : '영상 확정'),
-                  ),
-                ],
+              child: _MotionCard(
+                cut: cut,
+                baseUrl: widget.api.baseUrl,
+                onRegenerate: () => _regenerateVideo(cut.id),
+                onApprove: () {
+                  setState(() {
+                    _cuts = _cuts
+                        .map(
+                          (item) => item.id == cut.id
+                              ? item.copyWith(
+                                  videoApproved: !item.videoApproved,
+                                )
+                              : item,
+                        )
+                        .toList();
+                  });
+                },
               ),
             ),
         const SizedBox(height: 12),
@@ -1752,20 +1874,31 @@ class _ProductionFlowState extends State<_ProductionFlow> {
               ),
               const SizedBox(height: 10),
               _PrimaryButton(
-                label: '최종 결과물 생성',
-                disabled: !_allVideosApproved,
-                onTap: () {
-                  setState(() {
-                    _finalOutput =
-                        'YOUCHI_${widget.query.replaceAll(RegExp(r"\\s+"), "_")}_${_ratio.replaceAll(':', 'x')}_reference_based_6cuts.mp4';
-                  });
-                },
+                label: _rendering ? 'MP4 합치는 중…' : '최종 결과물 생성',
+                disabled: !_allVideosApproved || _rendering,
+                onTap: _renderFinal,
               ),
               if (_finalOutput != null) ...[
                 const SizedBox(height: 12),
                 Text(
-                  _finalOutput!,
-                  style: const TextStyle(color: YouchiColors.success),
+                  _finalOutput!.status,
+                  style: const TextStyle(
+                    color: YouchiColors.success,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _finalOutput!.name,
+                  style: const TextStyle(color: YouchiColors.faint),
+                ),
+                Text(
+                  '$_ratio · ${_finalOutput!.duration} · ${_finalOutput!.cutCount}컷 연결',
+                  style: const TextStyle(color: YouchiColors.faint),
+                ),
+                const SizedBox(height: 12),
+                _FinalVideoPlayer(
+                  url: resolveYouchiUrl(widget.api.baseUrl, _finalOutput!.videoUrl),
                 ),
               ],
             ],
@@ -1776,10 +1909,250 @@ class _ProductionFlowState extends State<_ProductionFlow> {
   }
 }
 
-class _CutCard extends StatelessWidget {
-  const _CutCard({required this.cut, required this.onApproveImage});
+class _MotionCard extends StatelessWidget {
+  const _MotionCard({
+    required this.cut,
+    required this.baseUrl,
+    required this.onRegenerate,
+    required this.onApprove,
+  });
 
   final StoryboardCut cut;
+  final String baseUrl;
+  final VoidCallback onRegenerate;
+  final VoidCallback onApprove;
+
+  String _statusLabel() {
+    switch (cut.videoStatus) {
+      case VideoStatus.generating:
+        return 'Veo 영상 생성 중…';
+      case VideoStatus.failed:
+        return '영상 생성 실패';
+      case VideoStatus.generated:
+        return 'video v${cut.videoVersion}';
+      case VideoStatus.idle:
+        return '영상화 대기';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _PanelBox(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AspectRatio(
+            aspectRatio: cut.ratio == '16:9' ? 16 / 9 : 9 / 16,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                color: const Color(0xFF151316),
+                child: cut.videoUrl != null
+                    ? _CutVideoPlayer(url: resolveYouchiUrl(baseUrl, cut.videoUrl))
+                    : cut.imageUrl != null
+                    ? Image.network(
+                        resolveYouchiUrl(baseUrl, cut.imageUrl),
+                        fit: BoxFit.cover,
+                      )
+                    : null,
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text('CUT ${cut.number} · ${cut.motion}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 4),
+          Text(_statusLabel(), style: const TextStyle(color: YouchiColors.faint)),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: cut.imageUrl == null ||
+                          cut.videoStatus == VideoStatus.generating
+                      ? null
+                      : onRegenerate,
+                  child: Text(
+                    cut.videoStatus == VideoStatus.generating ? '생성 중…' : '영상 재생성',
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: cut.videoUrl == null ? null : onApprove,
+                  child: Text(cut.videoApproved ? '확정됨' : '영상 확정'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CutVideoPlayer extends StatefulWidget {
+  const _CutVideoPlayer({required this.url});
+
+  final String url;
+
+  @override
+  State<_CutVideoPlayer> createState() => _CutVideoPlayerState();
+}
+
+class _CutVideoPlayerState extends State<_CutVideoPlayer> {
+  VideoPlayerController? _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _init();
+  }
+
+  @override
+  void didUpdateWidget(covariant _CutVideoPlayer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.url != widget.url) {
+      _controller?.dispose();
+      _controller = null;
+      _init();
+    }
+  }
+
+  void _init() {
+    final controller = VideoPlayerController.networkUrl(Uri.parse(widget.url));
+    _controller = controller;
+    controller.initialize().then((_) {
+      if (!mounted) return;
+      setState(() {});
+      controller.setLooping(true);
+      controller.setVolume(0);
+      controller.play();
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = _controller;
+    if (controller == null || !controller.value.isInitialized) {
+      return const Center(
+        child: SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
+    }
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          controller.value.isPlaying ? controller.pause() : controller.play();
+        });
+      },
+      child: FittedBox(
+        fit: BoxFit.cover,
+        child: SizedBox(
+          width: controller.value.size.width,
+          height: controller.value.size.height,
+          child: VideoPlayer(controller),
+        ),
+      ),
+    );
+  }
+}
+
+class _FinalVideoPlayer extends StatefulWidget {
+  const _FinalVideoPlayer({required this.url});
+
+  final String url;
+
+  @override
+  State<_FinalVideoPlayer> createState() => _FinalVideoPlayerState();
+}
+
+class _FinalVideoPlayerState extends State<_FinalVideoPlayer> {
+  late final VideoPlayerController _controller;
+  bool _ready = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url))
+      ..initialize().then((_) {
+        if (!mounted) return;
+        setState(() => _ready = true);
+      });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_ready) {
+      return const SizedBox(
+        height: 120,
+        child: Center(
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: AspectRatio(
+        aspectRatio: _controller.value.aspectRatio,
+        child: Stack(
+          alignment: Alignment.bottomCenter,
+          children: [
+            VideoPlayer(_controller),
+            VideoProgressIndicator(_controller, allowScrubbing: true),
+            Positioned(
+              right: 8,
+              bottom: 28,
+              child: IconButton(
+                icon: Icon(
+                  _controller.value.isPlaying ? Icons.pause_circle : Icons.play_circle,
+                  color: Colors.white,
+                  size: 32,
+                ),
+                onPressed: () {
+                  setState(() {
+                    _controller.value.isPlaying
+                        ? _controller.pause()
+                        : _controller.play();
+                  });
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CutCard extends StatelessWidget {
+  const _CutCard({
+    required this.cut,
+    required this.baseUrl,
+    required this.onApproveImage,
+  });
+
+  final StoryboardCut cut;
+  final String baseUrl;
   final VoidCallback onApproveImage;
 
   @override
@@ -1805,7 +2178,10 @@ class _CutCard extends StatelessWidget {
                             style: const TextStyle(color: Colors.white),
                           ),
                         )
-                      : Image.network(cut.imageUrl!, fit: BoxFit.cover),
+                      : Image.network(
+                          resolveYouchiUrl(baseUrl, cut.imageUrl),
+                          fit: BoxFit.cover,
+                        ),
                 ),
               ),
             ),
